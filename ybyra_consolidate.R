@@ -34,7 +34,7 @@ library(fs)          # dir_ls, dir_create
 # ─────────────────────────────────────────────────────────────────────────────
 # 0. CONFIGURAÇÃO
 # ─────────────────────────────────────────────────────────────────────────────
-INPUT_MUN   <- "gee_exports"          # pasta com CSVs do GEE
+INPUT_MUN   <- "/Users/celsojunior/Documents/GitHub/ybyra-dashboard/data/INPUT"          # pasta com CSVs do GEE
 OUTPUT_DIR  <- "dashboard_data"       # pasta de saída
 FONTE       <- "YbYrá-BR"
 VERSAO      <- "v1.2"
