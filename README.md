@@ -1,92 +1,150 @@
-# Brasil Carbon Dashboard 🌿
+# YbYrá-BR 🌿
 
-**Plataforma interativa de emissões e remoções de gases de efeito estufa no Brasil**
+**Plataforma de estimativas de emissões por desmatamento e degradação florestal e remoções pelo crescimento de florestas secundárias no Brasil**
 
-Desenvolvida pelo IPAM / YbYrá-BR Project | UFMA / PPGBC
+Financiado pelo **CNPq** | Coordenação: Silva-Junior, C. H. L. | UFMA / PPGBC
 
 ---
 
-## Visão Geral
+## Sobre o Projeto
 
-Dashboard estático e completamente auto-contido para exploração, análise e exportação de dados de emissões e remoções de GEE no Brasil, compatível com publicação direta no GitHub Pages.
+O YbYrá-BR produz estimativas anuais, espacialmente explícitas (30m), de:
 
-## Funcionalidades
+- **Emissões** por desmatamento de floresta primária
+- **Emissões** por degradação florestal — fogo, corte seletivo e efeito de borda
+- **Remoções** pelo crescimento de florestas secundárias em regeneração
 
-- **Visualizações**: séries temporais, barras empilhadas, heatmaps, gráficos de contribuição, rankings
-- **Filtros dinâmicos**: território, bioma, categoria, ano, tipo de fluxo
-- **Análise de tendências**: regressão linear, média móvel, variação percentual com interpretação automática
-- **Balanço líquido**: sumidouro vs. fonte, por território e bioma
-- **Comparador territorial**: até 3 territórios em paralelo
-- **Relatórios automáticos**: exportação em Markdown e HTML
-- **Exportação de dados**: CSV filtrado, JSON de configuração
-- **Carregamento de CSV externo**: substitua os dados de demonstração pelos seus dados reais
+Cobertura temporal: **1986–2024** | Abrangência: **todos os biomas brasileiros**
 
-## Estrutura de Arquivos
+O nome deriva do Tupi: *y* (água) + *yrá* (árvore), evocando a interdependência entre floresta e ciclo hidrológico amazônico.
+
+---
+
+## Estrutura do Repositório
 
 ```
-carbon-dashboard/
-├── index.html          ← aplicação completa (auto-contida)
+ybyra-dashboard/
+├── index.html                          ← dashboard interativo (auto-contido)
 ├── README.md
-└── /data               ← opcional: adicione seus CSVs aqui
-    └── emissoes_remocoes_brasil.csv
+├── gee_export_municipality_biome_v1_2.js  ← script GEE para exportação de tabelas
+├── ybyra_consolidate.R                 ← consolidação dos CSVs em R
+└── data/                               ← (opcional) CSVs reais gerados pelo pipeline
+    └── emissoes_remocoes_dashboard.csv
 ```
 
-## Estrutura do CSV
+---
 
-```csv
-ano,territorio_tipo,territorio_nome,territorio_codigo,bioma,estado,municipio,
-categoria,subcategoria,tipo_fluxo,valor_co2e,unidade,fonte,versao
+## Dashboard
+
+Aplicação estática publicada no GitHub Pages. Funcionalidades:
+
+- Séries temporais de emissões e remoções por território, bioma e categoria
+- Balanço líquido (fonte vs. sumidouro)
+- Heatmap ano × categoria
+- Comparador de territórios
+- Ranking de maiores emissores e removedores
+- Análise de tendência com interpretação automática
+- Gerador de relatórios com gráficos exportáveis (HTML, Markdown)
+- Carregamento de CSV externo
+
+### Formato do CSV
+
+```
+ano, territorio_tipo, territorio_nome, territorio_codigo,
+bioma, estado, regiao, municipio,
+categoria, subcategoria, tipo_fluxo,
+valor_co2e, unidade, fonte, versao
 ```
 
-### Campos obrigatórios
+**Categorias de emissão:** Desmatamento · Fogo · Degradação florestal (efeito de borda) · Corte seletivo · Desmatamento de floresta secundária
 
-| Campo | Descrição |
-|---|---|
-| `ano` | Ano de referência (inteiro) |
-| `territorio_nome` | Nome do território (ex: "Pará") |
-| `bioma` | Bioma (ex: "Amazônia", "Cerrado") |
-| `categoria` | Categoria do fluxo (ex: "Desmatamento") |
-| `tipo_fluxo` | `Emissão` ou `Remoção` |
-| `valor_co2e` | Valor em tCO₂eq (numérico) |
-| `unidade` | Unidade (ex: "tCO2e") |
-| `fonte` | Fonte dos dados (ex: "YbYrá-BR") |
-| `versao` | Versão do produto (ex: "v1") |
+**Categorias de remoção:** Floresta secundária (regeneração natural)
 
-## Publicação no GitHub Pages
+**Unidade:** MgCO₂e (megagramas = toneladas de CO₂ equivalente)
 
-1. Crie um repositório no GitHub
-2. Faça upload do `index.html` e do `README.md`
-3. Vá em **Settings → Pages → Source: Deploy from a branch → main → / (root)**
-4. Acesse: `https://<usuario>.github.io/<repositorio>/`
+---
 
-## Dependências (CDN — sem instalação)
+## Pipeline de Dados
 
-- [ECharts 5.4.3](https://echarts.apache.org/) — gráficos interativos
-- [PapaParse 5.4.1](https://www.papaparse.com/) — leitura de CSV
-- [Google Fonts: DM Sans + DM Mono + Playfair Display](https://fonts.google.com/)
+### 1. Estimativas no Google Earth Engine
 
-## Categorias suportadas
+O script `gee_export_municipality_biome_v1_2.js` exporta tabelas CSV da coleção
+`emissions_removals_v1_2` agregadas por **município** e por **bioma**:
 
-### Emissões
-Desmatamento · Fogo · Degradação florestal · Corte seletivo · Efeito de borda · Agricultura · Pecuária · Solo · Outros
+```
+Coleção GEE: projects/ee-redd-brazil/assets/ybyra-br-model/emissions_removals_v1_2
+Bandas:  edge_co2 | logging_co2 | fire_co2 | defor_co2 | total_primary_co2
+         removal_sf_co2 | defor_sf_co2 | agc_sf_co2 | net_balance_co2
+Scale:   500 m (soma regional, erro < 0.5%)
+```
 
-### Remoções
-Floresta secundária · Regeneração natural · Restauração ativa · Manguezais · Sistemas agroflorestais · Outros
+### 2. Consolidação em R
+
+O script `ybyra_consolidate.R` lê os CSVs do GEE e gera o arquivo do dashboard:
+
+```r
+# Com os CSVs na pasta gee_exports/:
+source("ybyra_consolidate.R")
+# Saída: dashboard_data/emissoes_remocoes_dashboard.csv
+```
+
+Pacotes necessários: `tidyverse`, `fs`
+
+### 3. Carregar no dashboard
+
+Copie o CSV para a pasta `data/` do repositório. O dashboard tenta carregar automaticamente:
+
+```js
+fetch('./data/emissoes_remocoes_dashboard.csv')
+  .then(r => r.ok ? r.text() : null)
+  .then(csv => csv ? loadData(csv) : loadData(DEMO_CSV));
+```
+
+---
+
+## Metodologia
+
+### Emissões — floresta primária
+
+| Fonte | Método | Parâmetro-chave |
+|---|---|---|
+| Desmatamento | AGC × (44/12) × área | AGC inicial: QCN v2 30m |
+| Fogo | AGC_pre − AGC_post_fire | AGC_post = 0.07816 × AGC_pre^1.4702 |
+| Efeito de borda | AGC × ΔLoss(t) | Michaelis-Menten; α=22.518, β=1.615; EEW=390m |
+| Corte seletivo | AGC × p(n) | p(n) = 0.196 × exp(−0.0782 × (n−1)); Tabela 12, FREL Nacional 2024 |
+
+### Remoções — florestas secundárias
+
+Chapman-Richards: `AGC_sf(age) = A × (1 − b × exp(−K × age))^(1/(1−m))`
+
+Parâmetros calibrados por bioma (Robinson et al. 2025, *Nature Climate Change*).
+Idades de floresta secundária: Silva-Junior et al. (2020, *Scientific Data*), atualizado MapBiomas C10.1.
+
+### Balanço líquido
+
+`Balanço = Remoções − Emissões`  
+Positivo = sumidouro líquido · Negativo = fonte líquida
+
+---
+
+## Referências
+
+- Silva-Junior, C. H. L. et al. (2020). *Scientific Data*. doi:10.1038/s41597-020-00600-4
+- Robinson, N. P. et al. (2025). *Nature Climate Change*. doi:10.1038/s41558-025-02355-5
+- Aragão, L. E. O. C. et al. (2018). *Nature Communications*. doi:10.1038/s41467-017-02771-y
+- Lapola, D. M. et al. (2023). *Science* 379, eabp8622. doi:10.1126/science.abp8622
+- Brasil (2024). FREL Nacional Modificado v3. UNFCCC/REDD+.
+
+---
 
 ## Citação
 
 ```
-YbYrá-BR / IPAM · Brasil Carbon Dashboard v1.0 · 2024
-Silva-Junior, C. H. L. et al. · celsohlsj@gmail.com
-IPAM / UFMA / PPGBC
+Silva-Junior, C. H. L. et al. YbYrá-BR v1.2: estimativas de emissões por
+desmatamento e degradação florestal e remoções por florestas secundárias
+no Brasil (1986–2024). CNPq, 2025. celsohlsj@gmail.com
 ```
-
-## Referências
-
-- Silva-Junior et al. (2020). *Scientific Data*.
-- Robinson et al. (2025). *Nature Climate Change*.
-- Aragão et al. (2018). *Nature Communications*.
 
 ---
 
-*Plataforma desenvolvida para comunicação científica e suporte a MRV, REDD+ e políticas climáticas.*
+*Financiado pelo CNPq. Plataforma desenvolvida para comunicação científica e suporte a MRV, REDD+ e políticas climáticas.*
