@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>YbYrá-BR — Plataforma de Carbono Florestal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Source+Sans+3:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ── YBYRA-BR DESIGN SYSTEM ─────────────────────────────────── */
+:root {
+  /* Forest palette */
+  --forest:     #12261a;   /* sidebar bg — deep amazon night */
+  --forest-mid: #1e3d2a;
+  --forest-lit: #2d5c3f;
+  --canopy:     #3a7d55;   /* active accent */
+  --leaf:       #5aad7a;
+  --mist:       #a8c9b4;   /* muted green */
+
+  /* Warm naturals */
+  --parchment:  #f7f3ec;   /* main bg */
+  --cream:      #fffdf8;   /* surface */
+  --tan:        #ede7d9;   /* surface2 */
+  --sand:       #d6cdb8;   /* border */
+
+  /* Amber / fire */
+  --amber:      #c8903a;
+  --amber-soft: #f5e8d2;
+  --amber-mid:  #ddb87a;
+
+  /* Emission red-earth */
+  --ember:      #b84535;
+  --ember-soft: #f5e3df;
+  --ember-mid:  #d99080;
+
+  /* Text */
+  --ink:        #1a2416;
+  --ink-mid:    #4a5e45;
+  --ink-light:  #7a9475;
+
+  /* Selective logging indigo */
+  --indigo:     #4f5baf;
+  --indigo-soft:#e8eaf6;
+
+  /* Fonts */
+  --serif:  'Cormorant Garamond', Georgia, serif;
+  --sans:   'Source Sans 3', sans-serif;
+  --mono:   'DM Mono', monospace;
+
+  /* Geometry */
+  --radius:    14px;
+  --radius-sm: 8px;
+  --shadow:    0 1px 3px rgba(18,38,26,.07), 0 6px 20px rgba(18,38,26,.05);
+  --shadow-md: 0 4px 16px rgba(18,38,26,.12);
+}
+
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0 }
+html { scroll-behavior:smooth }
+body {
+  font-family: var(--sans);
+  background: var(--parchment);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── LAYOUT ───────────────────────────────────────────────────── */
+.app   { display:flex; min-height:100vh }
+.sidebar {
+  width: 252px; min-width:252px;
+  background: var(--forest);
+  display: flex; flex-direction:column;
+  position: fixed; top:0; left:0; height:100vh;
+  z-index: 100; overflow-y:auto;
+}
+.main  { margin-left:252px; flex:1; display:flex; flex-direction:column; min-height:100vh }
+.topbar {
+  background: var(--cream);
+  border-bottom: 1px solid var(--sand);
+  padding: 0 28px; height:58px;
+  display: flex; align-items:center; justify-content:space-between;
+  position: sticky; top:0; z-index:90;
+}
+.content { padding:28px; flex:1 }
+
+/* ── SIDEBAR ──────────────────────────────────────────────────── */
+.sidebar-logo {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.ybyra-logo {
+  display: flex; align-items:center; gap:12px; margin-bottom:10px;
+}
+.ybyra-icon {
+  width: 40px; height: 40px; flex-shrink:0;
+}
+.logo-wordmark {
+  display: flex; flex-direction:column; gap:1px;
+}
+.logo-name {
+  font-family: var(--serif);
+  font-size: 20px; font-weight:700;
+  color: #fff; line-height:1;
+  letter-spacing: .01em;
+}
+.logo-name em { color: var(--amber-mid); font-style:normal }
+.logo-tag {
+  font-family: var(--mono);
+  font-size: 10px; color: var(--mist);
+  letter-spacing: .12em; text-transform:uppercase;
+}
+.logo-desc {
+  font-size: 11px; color: rgba(168,201,180,.7);
+  line-height: 1.4; font-weight:300;
+  padding-top: 2px;
+}
+.sidebar-nav { padding:10px 0; flex:1 }
+.sidebar-section {
+  padding: 14px 20px 4px;
+  font-size: 9.5px; font-weight:600;
+  color: rgba(168,201,180,.5);
+  letter-spacing: .1em; text-transform:uppercase;
+}
+.nav-item {
+  display: flex; align-items:center; gap:10px;
+  padding: 9px 20px;
+  color: rgba(168,201,180,.75);
+  cursor: pointer; font-size:13px; font-weight:400;
+  border-left: 2px solid transparent;
+  transition: all .15s ease; user-select:none;
+}
+.nav-item:hover {
+  color: #fff;
+  background: rgba(255,255,255,.05);
+  border-left-color: rgba(168,201,180,.3);
+}
+.nav-item.active {
+  color: #fff;
+  background: rgba(90,173,122,.15);
+  border-left-color: var(--leaf);
+  font-weight: 600;
+}
+.nav-item .icon {
+  width:16px; text-align:center; flex-shrink:0;
+  font-size: 13px; opacity:.8;
+}
+.sidebar-footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.sidebar-footer .version {
+  font-family: var(--mono); font-size:10.5px;
+  color: rgba(168,201,180,.45);
+}
+.sidebar-footer .source {
+  font-size: 11px; color: rgba(168,201,180,.35); margin-top:2px;
+}
+
+/* ── TOPBAR ───────────────────────────────────────────────────── */
+.topbar-brand {
+  display: flex; align-items:center; gap:10px;
+}
+.topbar-logo-sm {
+  width:24px; height:24px; opacity:.6;
+}
+.topbar-title {
+  font-family: var(--serif);
+  font-size: 15px; font-weight:600;
+  color: var(--ink-mid);
+}
+.topbar-title span { color: var(--ink) }
+.topbar-actions { display:flex; gap:8px; align-items:center }
+
+/* ── BUTTONS ──────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items:center; gap:6px;
+  padding: 7px 15px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight:500; cursor:pointer;
+  border:none; transition:all .15s ease; font-family:var(--sans);
+}
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--sand); color: var(--ink-mid);
+}
+.btn-outline:hover {
+  border-color: var(--canopy); color: var(--canopy);
+  background: rgba(58,125,85,.06);
+}
+.btn-primary {
+  background: var(--forest-mid); color: #fff;
+  border: 1px solid var(--forest-lit);
+}
+.btn-primary:hover { background: var(--canopy) }
+.btn-amber {
+  background: var(--amber-soft);
+  color: var(--amber); border:1px solid var(--amber-mid);
+}
+.btn-amber:hover { background: var(--amber); color:#fff }
+
+/* ── FILTER BAR ───────────────────────────────────────────────── */
+.filter-bar {
+  background: var(--cream);
+  border: 1px solid var(--sand);
+  border-radius: var(--radius);
+  padding: 14px 18px 16px;
+  margin-bottom: 22px;
+  display: flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
+  box-shadow: var(--shadow);
+}
+.filter-group { display:flex; flex-direction:column; gap:4px; min-width:140px }
+.filter-label {
+  font-size: 10px; font-weight:600; color: var(--ink-light);
+  letter-spacing: .06em; text-transform:uppercase;
+}
+.filter-select,.filter-input {
+  background: var(--parchment);
+  border: 1px solid var(--sand);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px; color: var(--ink);
+  font-family: var(--sans); appearance:none; cursor:pointer;
+  transition: border .15s;
+}
+.filter-select:focus,.filter-input:focus {
+  outline:none; border-color: var(--canopy);
+}
+.filter-actions { display:flex; gap:8px; margin-left:auto; align-items:flex-end }
+
+/* ── SECTION ──────────────────────────────────────────────────── */
+.section { display:none }
+.section.active { display:block }
+.section-header { margin-bottom:22px }
+.section-title {
+  font-family: var(--serif);
+  font-size: 26px; color: var(--ink); font-weight:700;
+  line-height: 1.15; letter-spacing:-.01em;
+}
+.section-title em { color:var(--canopy); font-style:normal }
+.section-sub { font-size:13px; color:var(--ink-light); margin-top:5px }
+
+/* ── CARDS ────────────────────────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(190px,1fr));
+  gap: 12px; margin-bottom:22px;
+}
+.card {
+  background: var(--cream);
+  border: 1px solid var(--sand);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow);
+  position: relative; overflow:hidden;
+}
+.card::before {
+  content:'';
+  position: absolute; top:0; left:0; right:0; height:3px;
+  background: var(--sand); border-radius:var(--radius) var(--radius) 0 0;
+}
+.card.c-emission::before { background:linear-gradient(90deg,var(--ember),var(--amber)) }
+.card.c-removal::before  { background:linear-gradient(90deg,var(--canopy),var(--leaf)) }
+.card.c-balance::before  { background:linear-gradient(90deg,var(--forest-mid),var(--canopy)) }
+.card.c-info::before     { background:linear-gradient(90deg,var(--amber),var(--amber-mid)) }
+.card-label {
+  font-size: 10px; font-weight:600; color: var(--ink-light);
+  letter-spacing: .06em; text-transform:uppercase; margin-bottom:8px;
+}
+.card-icon-bg {
+  position:absolute; top:10px; right:14px;
+  font-size:26px; opacity:.12;
+}
+.card-value {
+  font-family: var(--mono);
+  font-size: 23px; font-weight:500; color:var(--ink); line-height:1;
+}
+.card-value.emission { color:var(--ember) }
+.card-value.removal  { color:var(--canopy) }
+.card-value.balance-neg { color:var(--ember) }
+.card-value.balance-pos { color:var(--forest-mid) }
+.card-sub { font-size:11.5px; color:var(--ink-light); margin-top:6px }
+.card-trend {
+  display:inline-flex; align-items:center; gap:3px;
+  font-size:11px; font-weight:600; margin-top:7px;
+  padding:2px 8px; border-radius:4px;
+}
+.card-trend.up      { background:var(--ember-soft); color:var(--ember) }
+.card-trend.down    { background:rgba(58,125,85,.1); color:var(--canopy) }
+.card-trend.neutral { background:var(--tan); color:var(--ink-light) }
+
+/* ── CHART CARDS ──────────────────────────────────────────────── */
+.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:22px }
+.charts-grid.single  { grid-template-columns:1fr }
+.charts-grid.thirds  { grid-template-columns:1fr 1fr 1fr }
+.chart-card {
+  background: var(--cream);
+  border: 1px solid var(--sand);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.chart-title {
+  font-family: var(--serif);
+  font-size: 15px; font-weight:600; color:var(--ink); margin-bottom:3px;
+}
+.chart-sub { font-size:11.5px; color:var(--ink-light); margin-bottom:14px }
+.chart-container { width:100%; height:280px }
+.chart-container.tall  { height:360px }
+.chart-container.short { height:220px }
+
+/* ── TABLE ────────────────────────────────────────────────────── */
+.table-wrap { overflow-x:auto; border-radius:var(--radius-sm); border:1px solid var(--sand) }
+table { width:100%; border-collapse:collapse; font-size:13px }
+thead th {
+  background:var(--tan); padding:10px 14px; text-align:left;
+  font-weight:600; font-size:10.5px; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--ink-light);
+  border-bottom:1px solid var(--sand);
+}
+tbody tr  { border-bottom:1px solid var(--tan) }
+tbody tr:last-child { border-bottom:none }
+tbody tr:hover { background:var(--tan) }
+tbody td  { padding:10px 14px; color:var(--ink) }
+.badge {
+  display:inline-block; padding:2px 8px; border-radius:4px;
+  font-size:10.5px; font-weight:600; font-family:'DM Mono',monospace;
+}
+.badge.emission { background:var(--ember-soft); color:var(--ember) }
+.badge.removal  { background:rgba(58,125,85,.1); color:var(--canopy) }
+
+/* ── TREND ────────────────────────────────────────────────────── */
+.trend-box {
+  background:var(--cream); border:1px solid var(--sand);
+  border-radius:var(--radius); padding:20px;
+  box-shadow:var(--shadow); margin-bottom:14px;
+}
+.trend-box h4 { font-family:var(--serif); font-size:16px; margin-bottom:10px }
+.trend-text {
+  font-size:13px; color:var(--ink-mid); line-height:1.8;
+  padding:12px 16px; background:var(--tan);
+  border-radius:var(--radius-sm);
+  border-left:3px solid var(--canopy);
+}
+.trend-stats { display:flex; gap:24px; flex-wrap:wrap; margin-top:14px }
+.trend-stat   { display:flex; flex-direction:column; gap:2px }
+.trend-stat-label {
+  font-size:10px; color:var(--ink-light); font-weight:600;
+  text-transform:uppercase; letter-spacing:.05em;
+}
+.trend-stat-value { font-family:'DM Mono',monospace; font-size:16px; color:var(--ink) }
+
+/* ── RANKING ──────────────────────────────────────────────────── */
+.ranking-list { display:flex; flex-direction:column; gap:5px }
+.rank-item {
+  display:flex; align-items:center; gap:10px;
+  padding:8px 12px; background:var(--parchment);
+  border:1px solid var(--sand); border-radius:var(--radius-sm);
+}
+.rank-num { font-family:'DM Mono',monospace; font-size:11px; color:var(--ink-light); min-width:22px }
+.rank-name { font-size:13px; flex:1 }
+.rank-bar-wrap { width:130px; height:5px; background:var(--tan); border-radius:3px; overflow:hidden }
+.rank-bar { height:100%; border-radius:3px }
+.rank-bar.emission { background:var(--ember) }
+.rank-bar.removal  { background:var(--canopy) }
+.rank-value { font-family:'DM Mono',monospace; font-size:11.5px; min-width:85px; text-align:right; color:var(--ink-mid) }
+
+/* ── COMPARE ──────────────────────────────────────────────────── */
+.compare-selector { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap }
+
+/* ── PROSE / METHODOLOGY ─────────────────────────────────────── */
+.prose { font-size:14px; line-height:1.85; color:var(--ink) }
+.prose h3 {
+  font-family:var(--serif); font-size:19px;
+  margin:26px 0 10px; color:var(--ink);
+}
+.prose h4 { font-size:14px; font-weight:600; margin:18px 0 8px }
+.prose p  { margin-bottom:12px; color:var(--ink-mid) }
+.prose code {
+  background:var(--tan); border:1px solid var(--sand);
+  padding:1px 6px; border-radius:4px;
+  font-family:'DM Mono',monospace; font-size:12px;
+}
+.callout {
+  background:rgba(58,125,85,.07);
+  border:1px solid var(--mist);
+  border-radius:var(--radius-sm); padding:14px 16px;
+  margin:16px 0; font-size:13px; color:var(--forest-mid);
+}
+.callout-warn {
+  background:var(--ember-soft); border-color:var(--ember-mid);
+  color:var(--ember);
+}
+
+/* ── REPORT PREVIEW ──────────────────────────────────────────── */
+.report-options { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px }
+.report-preview {
+  background:var(--cream); border:1px solid var(--sand);
+  border-radius:var(--radius); padding:36px;
+  min-height:400px; box-shadow:var(--shadow);
+}
+
+/* ── HEATMAP LEGEND ──────────────────────────────────────────── */
+.heatmap-legend {
+  display:flex; align-items:center; gap:8px;
+  font-size:11.5px; color:var(--ink-light); margin-top:6px;
+}
+.heatmap-grad {
+  width:100px; height:8px; border-radius:4px;
+  background:linear-gradient(to right,var(--tan),var(--ember));
+}
+
+/* ── TOAST ───────────────────────────────────────────────────── */
+#toast {
+  position:fixed; bottom:24px; right:24px;
+  background:var(--forest); color:#fff;
+  padding:10px 18px; border-radius:var(--radius-sm);
+  font-size:13px; font-weight:500; z-index:9999;
+  opacity:0; transition:opacity .25s; pointer-events:none;
+  border:1px solid var(--forest-lit);
+}
+#toast.show { opacity:1 }
+
+/* ── RESPONSIVE ──────────────────────────────────────────────── */
+@media(max-width:960px){
+  .sidebar{ width:220px; min-width:220px }
+  .main{ margin-left:220px }
+  .charts-grid{ grid-template-columns:1fr }
+  .charts-grid.thirds{ grid-template-columns:1fr }
+}
+@media(max-width:660px){
+  .sidebar{ transform:translateX(-100%); transition:transform .25s }
+  .sidebar.open{ transform:translateX(0) }
+  .main{ margin-left:0 }
+  .content{ padding:16px }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── SIDEBAR ─────────────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="ybyra-logo">
+      <!-- YbYrá Logo SVG -->
+      <svg class="ybyra-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Root water waves -->
+        <path d="M4 32 Q8 29 12 32 Q16 35 20 32 Q24 29 28 32 Q32 35 36 32" stroke="#3a7d55" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        <path d="M7 36 Q11 33 15 36 Q19 39 23 36 Q27 33 31 36" stroke="#2d5c3f" stroke-width="1" fill="none" stroke-linecap="round" opacity=".6"/>
+        <!-- Trunk -->
+        <path d="M20 30 L20 18" stroke="#c8903a" stroke-width="2.2" stroke-linecap="round"/>
+        <!-- Left branch system -->
+        <path d="M20 24 Q14 20 10 16" stroke="#5aad7a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M20 21 Q15 17 13 13" stroke="#5aad7a" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+        <path d="M20 18 Q16 14 15 10" stroke="#3a7d55" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+        <!-- Right branch system -->
+        <path d="M20 24 Q26 20 30 16" stroke="#5aad7a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M20 21 Q25 17 27 13" stroke="#5aad7a" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+        <path d="M20 18 Q24 14 25 10" stroke="#3a7d55" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+        <!-- Crown leaves -->
+        <circle cx="10" cy="15" r="3.2" fill="#3a7d55" opacity=".85"/>
+        <circle cx="13" cy="12" r="2.6" fill="#5aad7a" opacity=".9"/>
+        <circle cx="15" cy="9"  r="2.2" fill="#3a7d55" opacity=".8"/>
+        <circle cx="20" cy="7"  r="3"   fill="#2d5c3f" opacity=".95"/>
+        <circle cx="25" cy="9"  r="2.2" fill="#3a7d55" opacity=".8"/>
+        <circle cx="27" cy="12" r="2.6" fill="#5aad7a" opacity=".9"/>
+        <circle cx="30" cy="15" r="3.2" fill="#3a7d55" opacity=".85"/>
+        <!-- Data flow dots on trunk -->
+        <circle cx="20" cy="22" r="1.2" fill="#c8903a" opacity=".8"/>
+        <circle cx="20" cy="26" r="1"   fill="#ddb87a" opacity=".6"/>
+      </svg>
+      <div class="logo-wordmark">
+        <span class="logo-name">Yb<em>Yrá</em>-BR</span>
+        <span class="logo-tag">v 1.0</span>
+      </div>
+    </div>
+    <div class="logo-desc">Carbono Florestal Brasileiro<br/>Emissões & Remoções de GEE</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Explorar</div>
+    <div class="nav-item active" onclick="showSection('overview')" data-section="overview"><span class="icon">◉</span>Visão Geral</div>
+    <div class="nav-item" onclick="showSection('emissions')" data-section="emissions"><span class="icon">▲</span>Emissões</div>
+    <div class="nav-item" onclick="showSection('removals')" data-section="removals"><span class="icon">▼</span>Remoções</div>
+    <div class="nav-item" onclick="showSection('balance')" data-section="balance"><span class="icon">⇄</span>Balanço Líquido</div>
+    <div class="sidebar-section">Análise</div>
+    <div class="nav-item" onclick="showSection('compare')" data-section="compare"><span class="icon">⊕</span>Comparador</div>
+    <div class="nav-item" onclick="showSection('trends')" data-section="trends"><span class="icon">↗</span>Tendências</div>
+    <div class="nav-item" onclick="showSection('ranking')" data-section="ranking"><span class="icon">⊞</span>Ranking</div>
+    <div class="nav-item" onclick="showSection('heatmap')" data-section="heatmap"><span class="icon">▦</span>Heatmap</div>
+    <div class="sidebar-section">Dados</div>
+    <div class="nav-item" onclick="showSection('table')" data-section="table"><span class="icon">≡</span>Tabela de Dados</div>
+    <div class="nav-item" onclick="showSection('reports')" data-section="reports"><span class="icon">⎙</span>Relatórios</div>
+    <div class="nav-item" onclick="showSection('methodology')" data-section="methodology"><span class="icon">ℹ</span>Metodologia</div>
+    <div class="nav-item" onclick="showSection('download')" data-section="download"><span class="icon">↓</span>Download</div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="version">YbYrá-BR · v1.0.0 · 2025</div>
+    <div class="source">Carbono Florestal Brasileiro</div>
+  </div>
+</aside>
+
+<!-- ── MAIN ───────────────────────────────────────────────────── -->
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-brand">
+      <!-- mini logo in topbar -->
+      <svg class="topbar-logo-sm" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 30 L20 18" stroke="#c8903a" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M20 24 Q14 20 10 16" stroke="#5aad7a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M20 24 Q26 20 30 16" stroke="#5aad7a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <circle cx="20" cy="8" r="3.5" fill="#2d5c3f"/>
+        <circle cx="11" cy="16" r="3" fill="#3a7d55" opacity=".85"/>
+        <circle cx="29" cy="16" r="3" fill="#3a7d55" opacity=".85"/>
+      </svg>
+      <div class="topbar-title"><span id="topbar-label">Visão Geral</span></div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-outline" onclick="showSection('reports')">⎙ Relatório</button>
+      <button class="btn btn-outline" onclick="exportCSV()">↓ CSV</button>
+      <button class="btn btn-amber" onclick="showSection('download')">↓ Download</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <div class="filter-group">
+        <span class="filter-label">Tipo de recorte</span>
+        <select class="filter-select" id="f-terrtype" onchange="applyFilters()">
+          <option value="all">Todos</option>
+          <option value="municipio">Município</option>
+          <option value="estado">Estado</option>
+          <option value="regiao">Região</option>
+          <option value="bioma">Bioma</option>
+          <option value="pais">Brasil</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Território</span>
+        <select class="filter-select" id="f-territory" onchange="applyFilters()">
+          <option value="all">Todos</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Estado / Região</span>
+        <select class="filter-select" id="f-state" onchange="applyFilters()">
+          <option value="all">Todos</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Bioma</span>
+        <select class="filter-select" id="f-biome" onchange="applyFilters()">
+          <option value="all">Todos</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Categoria</span>
+        <select class="filter-select" id="f-category" onchange="applyFilters()">
+          <option value="all">Todas</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Ano início</span>
+        <select class="filter-select" id="f-year-start" onchange="applyFilters()"></select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Ano fim</span>
+        <select class="filter-select" id="f-year-end" onchange="applyFilters()"></select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Tipo de fluxo</span>
+        <select class="filter-select" id="f-flux" onchange="applyFilters()">
+          <option value="all">Ambos</option>
+          <option value="Emissão">Emissão</option>
+          <option value="Remoção">Remoção</option>
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-outline" onclick="resetFilters()">✕ Limpar</button>
+      </div>
+    </div>
+
+    <!-- SECTION: OVERVIEW -->
+    <section class="section active" id="s-overview">
+      <div class="section-header">
+        <div class="section-title">Visão <em>Geral</em></div>
+        <div class="section-sub">Indicadores consolidados de emissões e remoções de GEE no Brasil</div>
+      </div>
+      <div class="cards-grid" id="overview-cards"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Série Temporal — Emissões & Remoções</div>
+          <div class="chart-sub">MtCO₂eq · período selecionado</div>
+          <div class="chart-container" id="chart-timeseries"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Balanço Líquido por Ano</div>
+          <div class="chart-sub">Remoções − Emissões (MtCO₂eq)</div>
+          <div class="chart-container" id="chart-balance"></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Emissões por Categoria</div>
+          <div class="chart-sub">Barras empilhadas · MtCO₂eq</div>
+          <div class="chart-container" id="chart-emission-stacked"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Remoções por Categoria</div>
+          <div class="chart-sub">Barras empilhadas · MtCO₂eq</div>
+          <div class="chart-container" id="chart-removal-stacked"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: EMISSIONS -->
+    <section class="section" id="s-emissions">
+      <div class="section-header">
+        <div class="section-title"><em>Emissões</em></div>
+        <div class="section-sub">Análise detalhada por categoria, território e período</div>
+      </div>
+      <div class="cards-grid" id="emission-cards"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Emissões Totais — Série Temporal</div>
+          <div class="chart-sub">MtCO₂eq por ano</div>
+          <div class="chart-container" id="chart-em-ts"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Contribuição por Categoria (%)</div>
+          <div class="chart-sub">Participação relativa no período selecionado</div>
+          <div class="chart-container" id="chart-em-pie"></div>
+        </div>
+      </div>
+      <div class="charts-grid single">
+        <div class="chart-card">
+          <div class="chart-title">Ranking de Territórios — Emissões</div>
+          <div class="chart-sub">Top 10 maiores emissores · soma do período</div>
+          <div class="chart-container tall" id="chart-em-rank"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: REMOVALS -->
+    <section class="section" id="s-removals">
+      <div class="section-header">
+        <div class="section-title"><em>Remoções</em></div>
+        <div class="section-sub">Análise detalhada de remoções de carbono por categoria e território</div>
+      </div>
+      <div class="cards-grid" id="removal-cards"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Remoções Totais — Série Temporal</div>
+          <div class="chart-sub">MtCO₂eq por ano</div>
+          <div class="chart-container" id="chart-rm-ts"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Contribuição por Categoria (%)</div>
+          <div class="chart-sub">Participação relativa no período selecionado</div>
+          <div class="chart-container" id="chart-rm-pie"></div>
+        </div>
+      </div>
+      <div class="charts-grid single">
+        <div class="chart-card">
+          <div class="chart-title">Ranking de Territórios — Remoções</div>
+          <div class="chart-sub">Top 10 maiores removedores · soma do período</div>
+          <div class="chart-container tall" id="chart-rm-rank"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: BALANCE -->
+    <section class="section" id="s-balance">
+      <div class="section-header">
+        <div class="section-title">Balanço <em>Líquido</em></div>
+        <div class="section-sub">Resultado líquido de carbono: sumidouro (+) ou fonte (−)</div>
+      </div>
+      <div class="cards-grid" id="balance-cards"></div>
+      <div class="charts-grid single">
+        <div class="chart-card">
+          <div class="chart-title">Balanço Líquido — Série Temporal</div>
+          <div class="chart-sub">MtCO₂eq · verde = sumidouro, vermelho = fonte</div>
+          <div class="chart-container tall" id="chart-balance-ts"></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Balanço por Território</div>
+          <div class="chart-sub">Soma do período selecionado</div>
+          <div class="chart-container" id="chart-balance-terr"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Balanço por Bioma</div>
+          <div class="chart-sub">Soma do período selecionado</div>
+          <div class="chart-container" id="chart-balance-biome"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: COMPARE -->
+    <section class="section" id="s-compare">
+      <div class="section-header">
+        <div class="section-title">Comparador de <em>Territórios</em></div>
+        <div class="section-sub">Selecione dois ou mais territórios para comparação lado a lado</div>
+      </div>
+      <div class="compare-selector">
+        <div class="filter-group">
+          <span class="filter-label">Território A</span>
+          <select class="filter-select" id="cmp-a" onchange="updateCompare()"></select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Território B</span>
+          <select class="filter-select" id="cmp-b" onchange="updateCompare()"></select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Território C (opcional)</span>
+          <select class="filter-select" id="cmp-c" onchange="updateCompare()">
+            <option value="">— Nenhum —</option>
+          </select>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Emissões Comparadas</div>
+          <div class="chart-sub">Série temporal · MtCO₂eq</div>
+          <div class="chart-container" id="chart-cmp-em"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Remoções Comparadas</div>
+          <div class="chart-sub">Série temporal · MtCO₂eq</div>
+          <div class="chart-container" id="chart-cmp-rm"></div>
+        </div>
+      </div>
+      <div class="charts-grid single">
+        <div class="chart-card">
+          <div class="chart-title">Balanço Líquido Comparado</div>
+          <div class="chart-sub">MtCO₂eq por ano</div>
+          <div class="chart-container" id="chart-cmp-bal"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: TRENDS -->
+    <section class="section" id="s-trends">
+      <div class="section-header">
+        <div class="section-title">Análise de <em>Tendências</em></div>
+        <div class="section-sub">Tendência linear, variação percentual, média móvel e interpretação automática</div>
+      </div>
+      <div id="trends-content"></div>
+    </section>
+
+    <!-- SECTION: RANKING -->
+    <section class="section" id="s-ranking">
+      <div class="section-header">
+        <div class="section-title"><em>Ranking</em></div>
+        <div class="section-sub">Maiores emissores e removedores por território e categoria</div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">▲ Top Territórios — Emissões</div>
+          <div class="chart-sub">Soma total · período selecionado</div>
+          <div id="rank-em-list" class="ranking-list" style="margin-top:8px"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">▼ Top Territórios — Remoções</div>
+          <div class="chart-sub">Soma total · período selecionado</div>
+          <div id="rank-rm-list" class="ranking-list" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">▲ Categorias — Emissões</div>
+          <div class="chart-sub">Soma total · período selecionado</div>
+          <div id="rank-cat-em-list" class="ranking-list" style="margin-top:8px"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">▼ Categorias — Remoções</div>
+          <div class="chart-sub">Soma total · período selecionado</div>
+          <div id="rank-cat-rm-list" class="ranking-list" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: HEATMAP -->
+    <section class="section" id="s-heatmap">
+      <div class="section-header">
+        <div class="section-title">Heatmap — Ano × <em>Categoria</em></div>
+        <div class="section-sub">Distribuição temporal de emissões e remoções por categoria</div>
+      </div>
+      <div class="charts-grid single">
+        <div class="chart-card">
+          <div class="chart-title">Heatmap — Emissões (MtCO₂eq)</div>
+          <div class="heatmap-legend"><span>Baixo</span><div class="heatmap-grad"></div><span>Alto</span></div>
+          <div class="chart-container tall" id="chart-heatmap-em"></div>
+        </div>
+      </div>
+      <div class="charts-grid single">
+        <div class="chart-card">
+          <div class="chart-title">Heatmap — Remoções (MtCO₂eq)</div>
+          <div class="heatmap-legend"><span>Baixo</span><div class="heatmap-grad" style="background:linear-gradient(to right,var(--tan),var(--canopy))"></div><span>Alto</span></div>
+          <div class="chart-container tall" id="chart-heatmap-rm"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: TABLE -->
+    <section class="section" id="s-table">
+      <div class="section-header">
+        <div class="section-title">Tabela de <em>Dados</em></div>
+        <div class="section-sub">Visualização tabular com filtros e exportação</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:13px;color:var(--ink-light)"><span id="table-count">0</span> registros</div>
+        <button class="btn btn-outline" onclick="exportCSV()">↓ Exportar CSV filtrado</button>
+      </div>
+      <div class="table-wrap">
+        <table id="data-table">
+          <thead>
+            <tr>
+              <th>Ano</th><th>Tipo</th><th>Território</th><th>Bioma</th><th>Estado</th><th>Região</th><th>Categoria</th><th>Fluxo</th><th>Valor (MgCO₂e)</th><th>Fonte</th>
+            </tr>
+          </thead>
+          <tbody id="data-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SECTION: REPORTS -->
+    <section class="section" id="s-reports">
+      <div class="section-header">
+        <div class="section-title">Gerador de <em>Relatórios</em></div>
+        <div class="section-sub">Relatório executivo automático com gráficos e indicadores</div>
+      </div>
+      <div class="report-options">
+        <div class="chart-card">
+          <div class="chart-title" style="margin-bottom:12px">Opções</div>
+          <div class="filter-group" style="margin-bottom:12px">
+            <span class="filter-label">Tipo de fluxo</span>
+            <select class="filter-select" id="rpt-flux">
+              <option value="all">Emissões e Remoções</option>
+              <option value="Emissão">Apenas Emissões</option>
+              <option value="Remoção">Apenas Remoções</option>
+            </select>
+          </div>
+          <div class="filter-group" style="margin-bottom:12px">
+            <span class="filter-label">Título</span>
+            <input type="text" class="filter-input" id="rpt-title" value="Relatório de Emissões e Remoções — Brasil" style="width:100%"/>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+            <button class="btn btn-primary" onclick="generateReport()">⎙ Gerar prévia</button>
+            <button class="btn btn-outline" onclick="exportReportHTML()">HTML</button>
+            <button class="btn btn-outline" onclick="exportReportMarkdown()">Markdown</button>
+            <button class="btn btn-amber"   onclick="exportReportPDF()">PDF</button>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title" style="margin-bottom:12px">Interpretação automática</div>
+          <div id="auto-interpret" class="trend-text">Gere o relatório para ver a interpretação automática dos dados.</div>
+        </div>
+      </div>
+      <div class="report-preview" id="report-preview">
+        <div style="color:var(--ink-light);font-size:13px;text-align:center;padding-top:60px">Clique em "Gerar prévia" para visualizar o relatório.</div>
+      </div>
+    </section>
+
+    <!-- SECTION: METHODOLOGY -->
+    <section class="section" id="s-methodology">
+      <div class="section-header">
+        <div class="section-title"><em>Metodologia</em></div>
+        <div class="section-sub">Dados, variáveis, cálculos e limitações</div>
+      </div>
+      <div class="chart-card prose">
+        <h3>Sobre o Projeto YbYrá-BR</h3>
+        <p>O YbYrá-BR é uma plataforma de monitoramento de carbono florestal para o Brasil, baseada em sensoriamento remoto e modelagem espacialmente explícita. O nome deriva do Tupi: <em>y</em> (água) e <em>yrá</em> (árvore), evocando a interdependência entre floresta e ciclo hidrológico amazônico. Os dados integram mapeamentos anuais de uso e cobertura da terra, modelos de biomassa acima do solo e parâmetros de dinâmica de florestas secundárias.</p>
+        <div class="callout">Os valores são expressos em MgCO₂e (megagramas de CO₂ equivalente = toneladas), calculados a 30m de resolução e agregados por território.</div>
+        <h3>Fontes de Dados</h3>
+        <h4>Emissões</h4>
+        <p>As emissões compreendem quatro categorias principais: (1) <strong>Desmatamento</strong> — conversão de floresta primária, com dados PRODES/INPE; (2) <strong>Fogo</strong> — degradação por queimadas, com dados VIIRS e BDQueimadas; (3) <strong>Degradação florestal</strong> — efeito de borda, calculado com EEW de 390m (13 pixels × 30m); (4) <strong>Corte seletivo</strong> — exploração madeireira, com mapa anual MapBiomas Degradação e fatores de perda de biomassa por frequência de corte (0,29; 0,27; 0,26; 0,22 para eventos subsequentes). A metodologia segue os princípios do IPCC Tier 2/3 e o framework REDD+.</p>
+        <h4>Remoções</h4>
+        <p>As remoções são estimadas para florestas secundárias em regeneração via equação de Chapman-Richards: <code>AGC = A·(1 − exp(−K·age))^B</code>, com parâmetros calibrados para biomas brasileiros (Robinson et al. 2025, <em>Nature Climate Change</em>). As idades de floresta secundária derivam do dataset YbYrá-BR (Silva-Junior et al. 2020, <em>Scientific Data</em>), atualizado para MapBiomas Coleção 10.1.</p>
+        <h3>Balanço Líquido</h3>
+        <p><code>Balanço = Remoções − Emissões</code> — positivo = sumidouro líquido, negativo = fonte líquida.</p>
+        <h3>Tendência</h3>
+        <p>Regressão linear simples (mínimos quadrados). Variação percentual entre primeiro e último ano do período. Média móvel de 3 anos.</p>
+        <h3>Limitações</h3>
+        <div class="callout callout-warn">Os valores possuem incertezas associadas a mapeamentos de cobertura da terra, estimativas de biomassa e modelos de dinâmica florestal. Recomenda-se consultar a documentação técnica dos produtos de base.</div>
+        <h4>Referências</h4>
+        <p>Silva-Junior et al. (2020). <em>Scientific Data</em> · Robinson et al. (2025). <em>Nature Climate Change</em> · Aragão et al. (2018). <em>Nature Communications</em></p>
+        <h3>Citação</h3>
+        <p><code>Silva-Junior, C. H. L. et al. — YbYrá-BR v1.0 · 2025 · celsohlsj@gmail.com</code></p>
+      </div>
+    </section>
+
+    <!-- SECTION: DOWNLOAD -->
+    <section class="section" id="s-download">
+      <div class="section-header">
+        <div class="section-title">Download dos <em>Dados</em></div>
+        <div class="section-sub">Exportação em diferentes formatos</div>
+      </div>
+      <div class="charts-grid thirds">
+        <div class="chart-card" style="text-align:center;padding:32px 20px">
+          <div style="font-size:34px;margin-bottom:12px">📊</div>
+          <div class="chart-title">Dados Filtrados — CSV</div>
+          <div class="chart-sub" style="margin-bottom:16px">Exporta conforme os filtros ativos</div>
+          <button class="btn btn-primary" style="width:100%" onclick="exportCSV()">↓ Exportar CSV</button>
+        </div>
+        <div class="chart-card" style="text-align:center;padding:32px 20px">
+          <div style="font-size:34px;margin-bottom:12px">⚙️</div>
+          <div class="chart-title">Filtros — JSON</div>
+          <div class="chart-sub" style="margin-bottom:16px">Salva configuração para reprodutibilidade</div>
+          <button class="btn btn-outline" style="width:100%" onclick="exportFilterConfig()">↓ Exportar JSON</button>
+        </div>
+        <div class="chart-card" style="text-align:center;padding:32px 20px">
+          <div style="font-size:34px;margin-bottom:12px">📄</div>
+          <div class="chart-title">Relatório — Markdown</div>
+          <div class="chart-sub" style="margin-bottom:16px">Relatório executivo em .md</div>
+          <button class="btn btn-outline" style="width:100%" onclick="exportReportMarkdown()">↓ Exportar .md</button>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-top:14px">
+        <div class="chart-title" style="margin-bottom:8px">Carregar dados externos (CSV)</div>
+        <div style="font-size:13px;color:var(--ink-light);margin-bottom:12px">Carregue um CSV com a estrutura padrão do YbYrá-BR para substituir os dados de demonstração.</div>
+        <input type="file" id="csv-upload" accept=".csv" style="display:none" onchange="loadExternalCSV(event)"/>
+        <button class="btn btn-outline" onclick="document.getElementById('csv-upload').click()">📂 Carregar CSV local</button>
+        <span style="font-size:11.5px;color:var(--ink-light);margin-left:12px">ano, territorio_tipo, territorio_nome, territorio_codigo, bioma, estado, regiao, municipio, categoria, subcategoria, tipo_fluxo, valor_co2e, unidade, fonte, versao</span>
+      </div>
+    </section>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+<div id="toast"></div>
+<script>
+const DEMO_CSV = `ano,territorio_tipo,territorio_nome,territorio_codigo,bioma,estado,regiao,municipio,categoria,subcategoria,tipo_fluxo,valor_co2e,unidade,fonte,versao
+2017,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,210000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,45000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,18000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,22000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,8000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,38000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,95000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,25000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,8000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,55000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,185000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,62000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,15000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,22000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,42000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,18000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,12000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,4000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,88000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,20000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,12000000,MgCO2e,YbYrá-BR,v1
+2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,18000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,225000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,50000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,20000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,24000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,9000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,40000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,105000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,9000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,57000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,190000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,65000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,16000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,23000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,45000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,20000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,14000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,4500000,MgCO2e,YbYrá-BR,v1
+2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14500000,MgCO2e,YbYrá-BR,v1
+2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,92000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,22000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,13000000,MgCO2e,YbYrá-BR,v1
+2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,19000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,275000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,95000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,28000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,26000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,10000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,36000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,130000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,60000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,12000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,52000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,210000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,72000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,18000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,20000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,50000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,22000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,20000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,5000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,13000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,105000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,40000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,14000000,MgCO2e,YbYrá-BR,v1
+2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,17000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,260000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,70000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,25000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,25000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,10500000,MgCO2e,YbYrá-BR,v1
+2020,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,37500000,MgCO2e,YbYrá-BR,v1
+2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,120000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,45000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,10000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,53000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,200000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,70000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,17000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,21000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,48000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,21000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,16000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,4200000,MgCO2e,YbYrá-BR,v1
+2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,13500000,MgCO2e,YbYrá-BR,v1
+2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,98000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1
+2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,12500000,MgCO2e,YbYrá-BR,v1
+2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,18500000,MgCO2e,YbYrá-BR,v1
+2021,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,240000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,65000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,22000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,23000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,9500000,MgCO2e,YbYrá-BR,v1
+2021,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,39000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,115000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,42000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,9500000,MgCO2e,YbYrá-BR,v1
+2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,54000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,195000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,68000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,16000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,22000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,44000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,19000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,14000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,3800000,MgCO2e,YbYrá-BR,v1
+2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,95000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,26000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,12000000,MgCO2e,YbYrá-BR,v1
+2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,19000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,230000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,60000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,21000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,22000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,9000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,40000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,110000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,38000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,9000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,55000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,188000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,66000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,15000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,23000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,40000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,17000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,12000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,3500000,MgCO2e,YbYrá-BR,v1
+2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14500000,MgCO2e,YbYrá-BR,v1
+2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,90000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,24000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,11000000,MgCO2e,YbYrá-BR,v1
+2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,20000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,155614788,MgCO2e,YbYrá-BR,v1
+2023,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,32000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,15000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,18000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,7500000,MgCO2e,YbYrá-BR,v1
+2023,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,32000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,88000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,8200000,MgCO2e,YbYrá-BR,v1
+2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,57000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,165000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,58000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,14000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,25000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,35000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,15000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,10000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,3200000,MgCO2e,YbYrá-BR,v1
+2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,15000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,72000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,18000000,MgCO2e,YbYrá-BR,v1
+2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,9500000,MgCO2e,YbYrá-BR,v1
+2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,21000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,140000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,14000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,17000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,7000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,34000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,75000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,22000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,7500000,MgCO2e,YbYrá-BR,v1
+2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,59000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,152000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,55000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,13000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,26000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,30000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,13000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,9000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,2800000,MgCO2e,YbYrá-BR,v1
+2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,15500000,MgCO2e,YbYrá-BR,v1
+2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,65000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,15000000,MgCO2e,YbYrá-BR,v1
+2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,8500000,MgCO2e,YbYrá-BR,v1
+2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,22000000,MgCO2e,YbYrá-BR,v1`;
+
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let allData = [];
+let filteredData = [];
+let charts = {};
+
+// Category-specific colors (consistent across all charts)
+const CAT_COLORS = {
+  'Desmatamento':       '#b84535',
+  'Fogo':               '#e07b31',
+  'Degradação florestal': '#c45b8a',
+  'Corte seletivo':     '#5b4fcf',   // indigo — distinto e reconhecível
+  'Floresta secundária':'#3a7d55',
+  'Outros':             '#607d6f',
+};
+const COLORS_EM = ['#b84535','#e07b31','#c45b8a','#5b4fcf','#7b4b9e','#c0392b','#e74c3c','#f39c12'];
+const COLORS_RM = ['#3a7d55','#1a6e4a','#3aaf72','#27ae60','#16a085','#1abc9c','#2ecc71','#5dade2'];
+
+function catColor(cat, i, isRemoval) {
+  if (CAT_COLORS[cat]) return CAT_COLORS[cat];
+  return isRemoval ? COLORS_RM[i % COLORS_RM.length] : COLORS_EM[i % COLORS_EM.length];
+}
+
+// ─────────────────────────────────────────────
+// LOAD DATA
+// ─────────────────────────────────────────────
+function loadData(csvText) {
+  const result = Papa.parse(csvText, { header: true, skipEmptyLines: true, dynamicTyping: true });
+  allData = result.data.map(r => ({
+    ...r,
+    valor_co2e: +r.valor_co2e || 0,
+    ano: +r.ano || 0
+  }));
+  populateFilters();
+  applyFilters();
+}
+
+function populateFilters() {
+  const territories = [...new Set(allData.map(r => r.territorio_nome))].sort();
+  const biomes = [...new Set(allData.map(r => r.bioma).filter(Boolean))].sort();
+  const categories = [...new Set(allData.map(r => r.categoria))].sort();
+  const years = [...new Set(allData.map(r => r.ano))].sort();
+  // Estado + Região combined for the state/region filter
+  const statesAndRegions = [
+    ...new Set([
+      ...allData.map(r => r.estado).filter(Boolean),
+      ...allData.map(r => r.regiao).filter(Boolean)
+    ])
+  ].sort();
+
+  fillSelect('f-territory', territories);
+  fillSelect('f-state', statesAndRegions);
+  fillSelect('f-biome', biomes);
+  fillSelect('f-category', categories);
+  fillSelectYears('f-year-start', years);
+  fillSelectYears('f-year-end', years, true);
+  fillSelect('cmp-a', territories, false);
+  fillSelect('cmp-b', territories, false);
+  fillSelect('cmp-c', territories, false);
+
+  document.getElementById('cmp-a').value = territories[0] || '';
+  document.getElementById('cmp-b').value = territories[1] || territories[0] || '';
+}
+
+function fillSelect(id, opts, addAll = true) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const prev = sel.value;
+  while (sel.options.length > (addAll ? 1 : 0)) sel.remove(addAll ? 1 : 0);
+  opts.forEach(o => { const op = new Option(o, o); sel.appendChild(op); });
+  if (prev) sel.value = prev;
+}
+
+function fillSelectYears(id, years, last = false) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.innerHTML = '';
+  years.forEach(y => { sel.appendChild(new Option(y, y)); });
+  sel.value = last ? years[years.length - 1] : years[0];
+}
+
+// ─────────────────────────────────────────────
+// FILTER
+// ─────────────────────────────────────────────
+function applyFilters() {
+  const terrType = document.getElementById('f-terrtype').value;
+  const terr  = document.getElementById('f-territory').value;
+  const state = document.getElementById('f-state').value;
+  const biome = document.getElementById('f-biome').value;
+  const cat   = document.getElementById('f-category').value;
+  const yStart = +document.getElementById('f-year-start').value;
+  const yEnd   = +document.getElementById('f-year-end').value;
+  const flux   = document.getElementById('f-flux').value;
+
+  filteredData = allData.filter(r => {
+    if (terrType !== 'all' && r.territorio_tipo !== terrType) return false;
+    if (terr !== 'all' && r.territorio_nome !== terr) return false;
+    if (state !== 'all' && r.estado !== state && r.regiao !== state) return false;
+    if (biome !== 'all' && r.bioma !== biome) return false;
+    if (cat !== 'all' && r.categoria !== cat) return false;
+    if (r.ano < yStart || r.ano > yEnd) return false;
+    if (flux !== 'all' && r.tipo_fluxo !== flux) return false;
+    return true;
+  });
+
+  renderAll();
+}
+
+function resetFilters() {
+  document.getElementById('f-terrtype').value = 'all';
+  document.getElementById('f-territory').value = 'all';
+  document.getElementById('f-state').value = 'all';
+  document.getElementById('f-biome').value = 'all';
+  document.getElementById('f-category').value = 'all';
+  document.getElementById('f-flux').value = 'all';
+  const years = [...new Set(allData.map(r => r.ano))].sort();
+  document.getElementById('f-year-start').value = years[0];
+  document.getElementById('f-year-end').value = years[years.length - 1];
+  applyFilters();
+  toast('Filtros limpos');
+}
+
+// ─────────────────────────────────────────────
+// AGGREGATIONS
+// ─────────────────────────────────────────────
+function getByYear(data, flux) {
+  const map = {};
+  data.filter(r => flux === 'all' || r.tipo_fluxo === flux).forEach(r => {
+    map[r.ano] = (map[r.ano] || 0) + r.valor_co2e;
+  });
+  return map;
+}
+
+function getByYearCategory(data, flux) {
+  const cats = {}, years = new Set();
+  data.filter(r => r.tipo_fluxo === flux).forEach(r => {
+    years.add(r.ano);
+    if (!cats[r.categoria]) cats[r.categoria] = {};
+    cats[r.categoria][r.ano] = (cats[r.categoria][r.ano] || 0) + r.valor_co2e;
+  });
+  return { cats, years: [...years].sort() };
+}
+
+function getByTerritory(data, flux) {
+  const map = {};
+  data.filter(r => flux === 'all' || r.tipo_fluxo === flux).forEach(r => {
+    map[r.territorio_nome] = (map[r.territorio_nome] || 0) + r.valor_co2e;
+  });
+  return map;
+}
+
+function getByBiome(data, flux) {
+  const map = {};
+  data.filter(r => (flux === 'all' || r.tipo_fluxo === flux) && r.bioma).forEach(r => {
+    map[r.bioma] = (map[r.bioma] || 0) + r.valor_co2e;
+  });
+  return map;
+}
+
+function getYears() {
+  return [...new Set(filteredData.map(r => r.ano))].sort();
+}
+
+function totalFlux(data, flux) {
+  return data.filter(r => r.tipo_fluxo === flux).reduce((s, r) => s + r.valor_co2e, 0);
+}
+
+function toMt(v) { return v / 1e6; }
+function fmtMt(v) { return (v / 1e6).toFixed(1) + ' Mt'; }
+function fmtTrend(pct) {
+  if (pct > 2) return { label: `▲ +${pct.toFixed(1)}%`, cls: 'up' };
+  if (pct < -2) return { label: `▼ ${pct.toFixed(1)}%`, cls: 'down' };
+  return { label: `→ ${pct.toFixed(1)}%`, cls: 'neutral' };
+}
+
+// Linear trend slope (simple)
+function linearTrend(ys) {
+  const n = ys.length;
+  if (n < 2) return 0;
+  const xs = ys.map((_, i) => i);
+  const mx = xs.reduce((a, b) => a + b) / n;
+  const my = ys.reduce((a, b) => a + b) / n;
+  const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+  const den = xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+  return den ? num / den : 0;
+}
+
+function movingAvg(arr, w = 3) {
+  return arr.map((_, i) => {
+    const start = Math.max(0, i - Math.floor(w / 2));
+    const end = Math.min(arr.length, start + w);
+    const sl = arr.slice(start, end);
+    return sl.reduce((a, b) => a + b, 0) / sl.length;
+  });
+}
+
+// ─────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────
+const SECTION_LABELS = {
+  overview:'Visão Geral', emissions:'Emissões', removals:'Remoções',
+  balance:'Balanço Líquido', compare:'Comparador', trends:'Tendências',
+  ranking:'Ranking', heatmap:'Heatmap', table:'Tabela de Dados',
+  reports:'Relatórios', methodology:'Metodologia', download:'Download'
+};
+
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('s-' + id)?.classList.add('active');
+  document.querySelector(`[data-section="${id}"]`)?.classList.add('active');
+  document.getElementById('topbar-label').textContent = SECTION_LABELS[id] || id;
+  // lazy render section-specific
+  if (id === 'trends') renderTrends();
+  if (id === 'ranking') renderRanking();
+  if (id === 'heatmap') renderHeatmap();
+  if (id === 'compare') updateCompare();
+  if (id === 'table') renderTable();
+}
+
+// ─────────────────────────────────────────────
+// RENDER ALL
+// ─────────────────────────────────────────────
+function renderAll() {
+  renderOverviewCards();
+  renderOverviewCharts();
+  renderEmissionsSection();
+  renderRemovalsSection();
+  renderBalanceSection();
+  renderTable();
+  // lazy sections rendered on navigate
+}
+
+// ─────────────────────────────────────────────
+// CARDS
+// ─────────────────────────────────────────────
+function renderCard(container, { label, value, valueCls, sub, trend, icon, cardCls }) {
+  return `<div class="card ${cardCls||''}">
+    ${icon ? `<div class="card-icon-bg">${icon}</div>` : ''}
+    <div class="card-label">${label}</div>
+    <div class="card-value ${valueCls || ''}">${value}</div>
+    ${sub ? `<div class="card-sub">${sub}</div>` : ''}
+    ${trend ? `<span class="card-trend ${trend.cls}">${trend.label}</span>` : ''}
+  </div>`;
+}
+
+function pctChange(data, flux) {
+  const years = getYears();
+  if (years.length < 2) return 0;
+  const first = data.filter(r => r.ano === years[0] && r.tipo_fluxo === flux).reduce((s, r) => s + r.valor_co2e, 0);
+  const last = data.filter(r => r.ano === years[years.length - 1] && r.tipo_fluxo === flux).reduce((s, r) => s + r.valor_co2e, 0);
+  return first ? (last - first) / first * 100 : 0;
+}
+
+function renderOverviewCards() {
+  const totalEm = totalFlux(filteredData, 'Emissão');
+  const totalRm = totalFlux(filteredData, 'Remoção');
+  const balance = totalRm - totalEm;
+  const years = getYears();
+
+  // biggest emission category
+  const catEm = {};
+  filteredData.filter(r => r.tipo_fluxo === 'Emissão').forEach(r => catEm[r.categoria] = (catEm[r.categoria] || 0) + r.valor_co2e);
+  const topCatEm = Object.entries(catEm).sort((a, b) => b[1] - a[1])[0];
+
+  // biggest removal category
+  const catRm = {};
+  filteredData.filter(r => r.tipo_fluxo === 'Remoção').forEach(r => catRm[r.categoria] = (catRm[r.categoria] || 0) + r.valor_co2e);
+  const topCatRm = Object.entries(catRm).sort((a, b) => b[1] - a[1])[0];
+
+  // territory
+  const terrEm = getByTerritory(filteredData, 'Emissão');
+  const terrRm = getByTerritory(filteredData, 'Remoção');
+  const topTerrEm = Object.entries(terrEm).sort((a, b) => b[1] - a[1])[0];
+  const topTerrRm = Object.entries(terrRm).sort((a, b) => b[1] - a[1])[0];
+
+  const emPct = pctChange(filteredData, 'Emissão');
+  const rmPct = pctChange(filteredData, 'Remoção');
+  const balCls = balance >= 0 ? 'balance-pos' : 'balance-neg';
+  const balLabel = balance >= 0 ? '✓ Sumidouro líquido' : '⚠ Fonte líquida';
+
+  document.getElementById('overview-cards').innerHTML = [
+    renderCard(null, { label: 'Emissões Totais', value: fmtMt(totalEm), valueCls: 'emission', cardCls:'c-emission', sub: `${years[0]}–${years[years.length-1]} · ${filteredData.filter(r=>r.tipo_fluxo==='Emissão').length} registros`, trend: fmtTrend(emPct), icon: '🔥' }),
+    renderCard(null, { label: 'Remoções Totais', value: fmtMt(totalRm), valueCls: 'removal', cardCls:'c-removal', sub: `${years[0]}–${years[years.length-1]} · ${filteredData.filter(r=>r.tipo_fluxo==='Remoção').length} registros`, trend: fmtTrend(rmPct), icon: '🌿' }),
+    renderCard(null, { label: 'Balanço Líquido', value: fmtMt(balance), valueCls: balCls, cardCls:'c-balance', sub: balLabel, icon: '⇄' }),
+    renderCard(null, { label: 'Maior Fonte de Emissão', value: topCatEm ? topCatEm[0] : '—', cardCls:'c-info', sub: topCatEm ? fmtMt(topCatEm[1]) : '', icon: '▲' }),
+    renderCard(null, { label: 'Maior Fonte de Remoção', value: topCatRm ? topCatRm[0] : '—', cardCls:'c-removal', sub: topCatRm ? fmtMt(topCatRm[1]) : '', icon: '▼' }),
+    renderCard(null, { label: 'Top Emissor', value: topTerrEm ? topTerrEm[0] : '—', cardCls:'c-emission', sub: topTerrEm ? fmtMt(topTerrEm[1]) : '', icon: '📍' }),
+    renderCard(null, { label: 'Top Removedor', value: topTerrRm ? topTerrRm[0] : '—', cardCls:'c-removal', sub: topTerrRm ? fmtMt(topTerrRm[1]) : '', icon: '🌳' }),
+    renderCard(null, { label: 'Anos no Período', value: years.length, cardCls:'c-info', sub: years.length > 0 ? `${years[0]} a ${years[years.length-1]}` : '', icon: '📅' }),
+  ].join('');
+}
+
+// ─────────────────────────────────────────────
+// CHARTS
+// ─────────────────────────────────────────────
+function getOrCreateChart(id) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  if (charts[id]) { charts[id].dispose(); }
+  charts[id] = echarts.init(el);
+  return charts[id];
+}
+
+const BASE_OPTS = {
+  grid: { top: 20, right: 20, bottom: 50, left: 65, containLabel: false },
+  tooltip: { trigger: 'axis', backgroundColor: '#fffdf8', borderColor: '#d6cdb8', textStyle: { color: '#1a2416', fontFamily: 'Source Sans 3' } },
+};
+
+function renderOverviewCharts() {
+  const years = getYears();
+  const emByYear = getByYear(filteredData, 'Emissão');
+  const rmByYear = getByYear(filteredData, 'Remoção');
+  const emVals = years.map(y => toMt(emByYear[y] || 0));
+  const rmVals = years.map(y => toMt(rmByYear[y] || 0));
+  const balVals = years.map((y, i) => rmVals[i] - emVals[i]);
+
+  // Time series
+  const c1 = getOrCreateChart('chart-timeseries');
+  if (c1) c1.setOption({ ...BASE_OPTS,
+    legend: { data: ['Emissões', 'Remoções'], bottom: 0, textStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [
+      { name: 'Emissões', type: 'line', data: emVals, itemStyle: { color: '#b84535' }, lineStyle: { color: '#b84535', width: 2.5 }, areaStyle: { color: 'rgba(217,79,59,.08)' }, smooth: true, symbol: 'circle', symbolSize: 5 },
+      { name: 'Remoções', type: 'line', data: rmVals, itemStyle: { color: '#3a7d55' }, lineStyle: { color: '#3a7d55', width: 2.5 }, areaStyle: { color: 'rgba(42,125,82,.08)' }, smooth: true, symbol: 'circle', symbolSize: 5 }
+    ]
+  });
+
+  // Balance
+  const c2 = getOrCreateChart('chart-balance');
+  if (c2) c2.setOption({ ...BASE_OPTS,
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [{ type: 'bar', data: balVals.map(v => ({
+      value: v,
+      itemStyle: { color: v >= 0 ? '#3a7d55' : '#b84535', borderRadius: [3,3,0,0] }
+    })) }]
+  });
+
+  // Stacked emissions
+  const { cats: emCats, years: emYears } = getByYearCategory(filteredData, 'Emissão');
+  const c3 = getOrCreateChart('chart-emission-stacked');
+  if (c3) c3.setOption({ ...BASE_OPTS,
+    legend: { bottom: 0, type: 'scroll', textStyle: { fontFamily: 'Source Sans 3', fontSize: 11, color: '#7a9475' } },
+    xAxis: { type: 'category', data: emYears, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: Object.entries(emCats).map(([cat, vals], i) => ({
+      name: cat, type: 'bar', stack: 'em',
+      data: emYears.map(y => toMt(vals[y] || 0)),
+      itemStyle: { color: catColor(cat, i, false) }
+    }))
+  });
+
+  // Stacked removals
+  const { cats: rmCats, years: rmYears } = getByYearCategory(filteredData, 'Remoção');
+  const c4 = getOrCreateChart('chart-removal-stacked');
+  if (c4) c4.setOption({ ...BASE_OPTS,
+    legend: { bottom: 0, type: 'scroll', textStyle: { fontFamily: 'Source Sans 3', fontSize: 11, color: '#7a9475' } },
+    xAxis: { type: 'category', data: rmYears, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: Object.entries(rmCats).map(([cat, vals], i) => ({
+      name: cat, type: 'bar', stack: 'rm',
+      data: rmYears.map(y => toMt(vals[y] || 0)),
+      itemStyle: { color: catColor(cat, i, true) }
+    }))
+  });
+}
+
+function renderEmissionsSection() {
+  const totalEm = totalFlux(filteredData, 'Emissão');
+  const emPct = pctChange(filteredData, 'Emissão');
+  const years = getYears();
+  const catEm = {};
+  filteredData.filter(r => r.tipo_fluxo === 'Emissão').forEach(r => catEm[r.categoria] = (catEm[r.categoria] || 0) + r.valor_co2e);
+  const topCat = Object.entries(catEm).sort((a, b) => b[1] - a[1])[0];
+  document.getElementById('emission-cards').innerHTML = [
+    renderCard(null, { label: 'Total de Emissões', value: fmtMt(totalEm), valueCls: 'emission', sub: `${years[0]}–${years[years.length-1]}`, trend: fmtTrend(emPct) }),
+    renderCard(null, { label: 'Maior Categoria', value: topCat ? topCat[0] : '—', sub: topCat ? fmtMt(topCat[1]) : '' }),
+    renderCard(null, { label: 'Variação no Período', value: emPct.toFixed(1) + '%', valueCls: emPct > 0 ? 'emission' : 'removal', sub: `de ${years[0]} a ${years[years.length-1]}` }),
+  ].join('');
+
+  const emByYear = getByYear(filteredData, 'Emissão');
+  const emVals = years.map(y => toMt(emByYear[y] || 0));
+  const terrEm = Object.entries(getByTerritory(filteredData, 'Emissão')).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  const c1 = getOrCreateChart('chart-em-ts');
+  if (c1) c1.setOption({ ...BASE_OPTS,
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [{ type: 'line', data: emVals, itemStyle: { color: '#b84535' }, lineStyle: { color: '#b84535', width: 2.5 }, areaStyle: { color: 'rgba(217,79,59,.1)' }, smooth: true, symbol: 'circle', symbolSize: 6 }]
+  });
+
+  const c2 = getOrCreateChart('chart-em-pie');
+  if (c2) c2.setOption({ tooltip: { trigger: 'item', formatter: '{b}: {d}%', textStyle: { fontFamily: 'Source Sans 3' } },
+    legend: { bottom: 0, type: 'scroll', textStyle: { fontFamily: 'Source Sans 3', fontSize: 11, color: '#7a9475' } },
+    series: [{ type: 'pie', radius: ['35%', '65%'], center: ['50%', '45%'],
+      data: Object.entries(catEm).map(([k, v], i) => ({ name: k, value: toMt(v), itemStyle: { color: catColor(k, i, false) } })),
+      label: { formatter: '{d}%', fontFamily: 'DM Mono', fontSize: 11 } }]
+  });
+
+  const c3 = getOrCreateChart('chart-em-rank');
+  if (c3) c3.setOption({ ...BASE_OPTS, grid: { top: 20, right: 80, bottom: 30, left: 100 },
+    tooltip: { trigger: 'axis', textStyle: { fontFamily: 'Source Sans 3' } },
+    xAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'category', data: terrEm.map(t => t[0]).reverse(), axisLabel: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    series: [{ type: 'bar', data: terrEm.map(t => toMt(t[1])).reverse(),
+      itemStyle: { color: '#b84535', borderRadius: [0,4,4,0] }, label: { show: true, position: 'right', fontFamily: 'DM Mono', fontSize: 11, formatter: v => v.value.toFixed(0)+' Mt' } }]
+  });
+}
+
+function renderRemovalsSection() {
+  const totalRm = totalFlux(filteredData, 'Remoção');
+  const rmPct = pctChange(filteredData, 'Remoção');
+  const years = getYears();
+  const catRm = {};
+  filteredData.filter(r => r.tipo_fluxo === 'Remoção').forEach(r => catRm[r.categoria] = (catRm[r.categoria] || 0) + r.valor_co2e);
+  const topCat = Object.entries(catRm).sort((a, b) => b[1] - a[1])[0];
+  document.getElementById('removal-cards').innerHTML = [
+    renderCard(null, { label: 'Total de Remoções', value: fmtMt(totalRm), valueCls: 'removal', sub: `${years[0]}–${years[years.length-1]}`, trend: fmtTrend(rmPct) }),
+    renderCard(null, { label: 'Maior Categoria', value: topCat ? topCat[0] : '—', sub: topCat ? fmtMt(topCat[1]) : '' }),
+    renderCard(null, { label: 'Variação no Período', value: rmPct.toFixed(1) + '%', valueCls: rmPct > 0 ? 'removal' : 'emission', sub: `de ${years[0]} a ${years[years.length-1]}` }),
+  ].join('');
+
+  const rmByYear = getByYear(filteredData, 'Remoção');
+  const rmVals = years.map(y => toMt(rmByYear[y] || 0));
+  const terrRm = Object.entries(getByTerritory(filteredData, 'Remoção')).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  const c1 = getOrCreateChart('chart-rm-ts');
+  if (c1) c1.setOption({ ...BASE_OPTS,
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [{ type: 'line', data: rmVals, itemStyle: { color: '#3a7d55' }, lineStyle: { color: '#3a7d55', width: 2.5 }, areaStyle: { color: 'rgba(42,125,82,.1)' }, smooth: true, symbol: 'circle', symbolSize: 6 }]
+  });
+
+  const c2 = getOrCreateChart('chart-rm-pie');
+  if (c2) c2.setOption({ tooltip: { trigger: 'item', formatter: '{b}: {d}%', textStyle: { fontFamily: 'Source Sans 3' } },
+    legend: { bottom: 0, type: 'scroll', textStyle: { fontFamily: 'Source Sans 3', fontSize: 11, color: '#7a9475' } },
+    series: [{ type: 'pie', radius: ['35%', '65%'], center: ['50%', '45%'],
+      data: Object.entries(catRm).map(([k, v], i) => ({ name: k, value: toMt(v), itemStyle: { color: COLORS_RM[i % COLORS_RM.length] } })),
+      label: { formatter: '{d}%', fontFamily: 'DM Mono', fontSize: 11 } }]
+  });
+
+  const c3 = getOrCreateChart('chart-rm-rank');
+  if (c3) c3.setOption({ ...BASE_OPTS, grid: { top: 20, right: 80, bottom: 30, left: 100 },
+    xAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'category', data: terrRm.map(t => t[0]).reverse(), axisLabel: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    series: [{ type: 'bar', data: terrRm.map(t => toMt(t[1])).reverse(),
+      itemStyle: { color: '#3a7d55', borderRadius: [0,4,4,0] }, label: { show: true, position: 'right', fontFamily: 'DM Mono', fontSize: 11, formatter: v => v.value.toFixed(0)+' Mt' } }]
+  });
+}
+
+function renderBalanceSection() {
+  const years = getYears();
+  const emByYear = getByYear(filteredData, 'Emissão');
+  const rmByYear = getByYear(filteredData, 'Remoção');
+  const balVals = years.map(y => toMt((rmByYear[y] || 0) - (emByYear[y] || 0)));
+  const totalBalance = balVals.reduce((a, b) => a + b, 0);
+  const posCls = totalBalance >= 0 ? 'balance-pos' : 'balance-neg';
+
+  document.getElementById('balance-cards').innerHTML = [
+    renderCard(null, { label: 'Balanço Total do Período', value: totalBalance.toFixed(1) + ' Mt', valueCls: posCls, sub: totalBalance >= 0 ? '✓ Sumidouro líquido' : '⚠ Fonte líquida' }),
+    renderCard(null, { label: 'Ano com melhor balanço', value: years[balVals.indexOf(Math.max(...balVals))] || '—', sub: `${Math.max(...balVals).toFixed(1)} Mt` }),
+    renderCard(null, { label: 'Ano com pior balanço', value: years[balVals.indexOf(Math.min(...balVals))] || '—', sub: `${Math.min(...balVals).toFixed(1)} Mt`, valueCls: 'emission' }),
+  ].join('');
+
+  const c1 = getOrCreateChart('chart-balance-ts');
+  if (c1) c1.setOption({ ...BASE_OPTS, grid: { top: 20, right: 20, bottom: 50, left: 75 },
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [
+      { type: 'line', data: balVals, smooth: true, lineStyle: { color: '#3a7d55', width: 2.5 }, areaStyle: { color: (params) => params.data >= 0 ? 'rgba(42,125,82,.1)' : 'rgba(217,79,59,.1)' }, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: (params) => params.data >= 0 ? '#3a7d55' : '#b84535' },
+        markLine: { data: [{ yAxis: 0, lineStyle: { color: '#aaa', type: 'dashed', width: 1 } }], label: { show: false }, symbol: 'none' } },
+      { type: 'bar', data: balVals.map(v => ({ value: v, itemStyle: { color: v >= 0 ? 'rgba(42,125,82,.35)' : 'rgba(217,79,59,.35)', borderRadius: v >= 0 ? [3,3,0,0] : [0,0,3,3] } })) }
+    ]
+  });
+
+  const terrBalance = {};
+  const terrKeys = [...new Set(filteredData.map(r => r.territorio_nome))];
+  terrKeys.forEach(t => {
+    const em = filteredData.filter(r => r.territorio_nome === t && r.tipo_fluxo === 'Emissão').reduce((s, r) => s + r.valor_co2e, 0);
+    const rm = filteredData.filter(r => r.territorio_nome === t && r.tipo_fluxo === 'Remoção').reduce((s, r) => s + r.valor_co2e, 0);
+    terrBalance[t] = toMt(rm - em);
+  });
+  const sorted = Object.entries(terrBalance).sort((a, b) => b[1] - a[1]);
+
+  const c2 = getOrCreateChart('chart-balance-terr');
+  if (c2) c2.setOption({ ...BASE_OPTS, grid: { top: 10, right: 20, bottom: 50, left: 90 },
+    xAxis: { type: 'category', data: sorted.map(s => s[0]), axisLabel: { fontFamily: 'Source Sans 3', color: '#7a9475', fontSize: 11 } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [{ type: 'bar', data: sorted.map(s => ({ value: s[1], itemStyle: { color: s[1] >= 0 ? '#3a7d55' : '#b84535', borderRadius: s[1] >= 0 ? [3,3,0,0] : [0,0,3,3] } })) }]
+  });
+
+  const biomeBalance = {};
+  const biomes = [...new Set(filteredData.map(r => r.bioma).filter(Boolean))];
+  biomes.forEach(b => {
+    const em = filteredData.filter(r => r.bioma === b && r.tipo_fluxo === 'Emissão').reduce((s, r) => s + r.valor_co2e, 0);
+    const rm = filteredData.filter(r => r.bioma === b && r.tipo_fluxo === 'Remoção').reduce((s, r) => s + r.valor_co2e, 0);
+    biomeBalance[b] = toMt(rm - em);
+  });
+  const bmSorted = Object.entries(biomeBalance).sort((a, b) => b[1] - a[1]);
+
+  const c3 = getOrCreateChart('chart-balance-biome');
+  if (c3) c3.setOption({ ...BASE_OPTS, grid: { top: 10, right: 20, bottom: 50, left: 80 },
+    xAxis: { type: 'category', data: bmSorted.map(b => b[0]), axisLabel: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: [{ type: 'bar', data: bmSorted.map(b => ({ value: b[1], itemStyle: { color: b[1] >= 0 ? '#3a7d55' : '#b84535', borderRadius: b[1] >= 0 ? [3,3,0,0] : [0,0,3,3] } })) }]
+  });
+}
+
+// ─────────────────────────────────────────────
+// TRENDS
+// ─────────────────────────────────────────────
+function renderTrends() {
+  const years = getYears();
+  const emByYear = getByYear(filteredData, 'Emissão');
+  const rmByYear = getByYear(filteredData, 'Remoção');
+  const emVals = years.map(y => toMt(emByYear[y] || 0));
+  const rmVals = years.map(y => toMt(rmByYear[y] || 0));
+  const balVals = years.map((y, i) => rmVals[i] - emVals[i]);
+
+  function analyzeSeries(label, vals, cls) {
+    if (!vals.length || !years.length) return '';
+    const first = vals[0], last = vals[vals.length - 1];
+    const pct = first ? (last - first) / first * 100 : 0;
+    const slope = linearTrend(vals);
+    const trend = slope > 0.5 ? 'aumento' : slope < -0.5 ? 'redução' : 'estabilidade';
+    const avg = vals.reduce((a, b) => a + b) / vals.length;
+    const ma = movingAvg(vals);
+    const interpretation = `${label} apresentaram ${pct >= 0 ? 'aumento' : 'redução'} de ${Math.abs(pct).toFixed(1)}% entre ${years[0]} e ${years[years.length-1]}, com tendência geral de ${trend} no período selecionado. A média do período foi de ${avg.toFixed(1)} MtCO₂eq.`;
+
+    const chartId = 'trend-chart-' + cls;
+    setTimeout(() => {
+      const c = getOrCreateChart(chartId);
+      if (c) c.setOption({ ...BASE_OPTS,
+        legend: { data: [label, 'Média móvel 3a'], bottom: 0, textStyle: { fontFamily: 'Source Sans 3', color: '#7a9475', fontSize: 11 } },
+        xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+        yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+        series: [
+          { name: label, type: 'bar', data: vals, itemStyle: { color: cls === 'em' ? '#b84535' : cls === 'rm' ? '#3a7d55' : '#607d6f', borderRadius: [3,3,0,0] } },
+          { name: 'Média móvel 3a', type: 'line', data: ma, lineStyle: { color: '#1a2416', width: 2, type: 'dashed' }, symbol: 'none', smooth: true }
+        ]
+      });
+    }, 50);
+
+    return `<div class="trend-box">
+      <h4>${label}</h4>
+      <div class="trend-text">${interpretation}</div>
+      <div class="trend-stats">
+        <div class="trend-stat"><span class="trend-stat-label">Primeiro ano (${years[0]})</span><span class="trend-stat-value">${first.toFixed(1)} Mt</span></div>
+        <div class="trend-stat"><span class="trend-stat-label">Último ano (${years[years.length-1]})</span><span class="trend-stat-value">${last.toFixed(1)} Mt</span></div>
+        <div class="trend-stat"><span class="trend-stat-label">Variação %</span><span class="trend-stat-value">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span></div>
+        <div class="trend-stat"><span class="trend-stat-label">Média período</span><span class="trend-stat-value">${avg.toFixed(1)} Mt</span></div>
+        <div class="trend-stat"><span class="trend-stat-label">Tendência</span><span class="trend-stat-value">${trend}</span></div>
+      </div>
+      <div class="chart-container short" id="${chartId}" style="margin-top:14px"></div>
+    </div>`;
+  }
+
+  document.getElementById('trends-content').innerHTML =
+    analyzeSeries('Emissões', emVals, 'em') +
+    analyzeSeries('Remoções', rmVals, 'rm') +
+    analyzeSeries('Balanço Líquido', balVals, 'bal');
+}
+
+// ─────────────────────────────────────────────
+// RANKING
+// ─────────────────────────────────────────────
+function renderRanking() {
+  function buildList(id, entries, cls) {
+    const max = entries[0] ? entries[0][1] : 1;
+    document.getElementById(id).innerHTML = entries.slice(0, 8).map(([name, val], i) => `
+      <div class="rank-item">
+        <span class="rank-num">#${i+1}</span>
+        <span class="rank-name">${name}</span>
+        <div class="rank-bar-wrap"><div class="rank-bar ${cls}" style="width:${(val/max*100).toFixed(0)}%"></div></div>
+        <span class="rank-value">${fmtMt(val)}</span>
+      </div>`).join('');
+  }
+
+  const terrEm = Object.entries(getByTerritory(filteredData, 'Emissão')).sort((a, b) => b[1] - a[1]);
+  const terrRm = Object.entries(getByTerritory(filteredData, 'Remoção')).sort((a, b) => b[1] - a[1]);
+
+  const catEmMap = {}, catRmMap = {};
+  filteredData.filter(r => r.tipo_fluxo === 'Emissão').forEach(r => catEmMap[r.categoria] = (catEmMap[r.categoria] || 0) + r.valor_co2e);
+  filteredData.filter(r => r.tipo_fluxo === 'Remoção').forEach(r => catRmMap[r.categoria] = (catRmMap[r.categoria] || 0) + r.valor_co2e);
+
+  buildList('rank-em-list', terrEm, 'emission');
+  buildList('rank-rm-list', terrRm, 'removal');
+  buildList('rank-cat-em-list', Object.entries(catEmMap).sort((a, b) => b[1] - a[1]), 'emission');
+  buildList('rank-cat-rm-list', Object.entries(catRmMap).sort((a, b) => b[1] - a[1]), 'removal');
+}
+
+// ─────────────────────────────────────────────
+// HEATMAP
+// ─────────────────────────────────────────────
+function renderHeatmap() {
+  const { cats: emCats, years } = getByYearCategory(filteredData, 'Emissão');
+  const { cats: rmCats } = getByYearCategory(filteredData, 'Remoção');
+  const emCatNames = Object.keys(emCats);
+  const rmCatNames = Object.keys(rmCats);
+
+  function buildHeatData(cats, catNames, years) {
+    const data = [];
+    let max = 0;
+    catNames.forEach((cat, ci) => years.forEach((yr, yi) => {
+      const v = toMt(cats[cat]?.[yr] || 0);
+      if (v > max) max = v;
+      data.push([yi, ci, v]);
+    }));
+    return { data, max };
+  }
+
+  const { data: emData, max: emMax } = buildHeatData(emCats, emCatNames, years);
+  const { data: rmData, max: rmMax } = buildHeatData(rmCats, rmCatNames, years);
+
+  const heatOpts = (data, max, cats, yrs, clrs) => ({
+    tooltip: { position: 'top', formatter: p => `${cats[p.data[1]]} / ${yrs[p.data[0]]}: ${p.data[2].toFixed(1)} Mt`, textStyle: { fontFamily: 'Source Sans 3' } },
+    grid: { top: 20, right: 20, bottom: 50, left: 140 },
+    xAxis: { type: 'category', data: yrs, splitArea: { show: true }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'category', data: cats, splitArea: { show: true }, axisLabel: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    visualMap: { min: 0, max, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, inRange: { color: clrs }, textStyle: { fontFamily: 'Source Sans 3', color: '#7a9475', fontSize: 11 } },
+    series: [{ type: 'heatmap', data, label: { show: true, formatter: p => p.data[2] > 0 ? p.data[2].toFixed(0) : '', fontFamily: 'DM Mono', fontSize: 10 }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,.2)' } } }]
+  });
+
+  const c1 = getOrCreateChart('chart-heatmap-em');
+  if (c1) c1.setOption(heatOpts(emData, emMax, emCatNames, years, ['#fce9e7', '#e07b31', '#b84535', '#a93226']));
+
+  const c2 = getOrCreateChart('chart-heatmap-rm');
+  if (c2) c2.setOption(heatOpts(rmData, rmMax, rmCatNames, years, ['#e4f4ed', '#7ec9a0', '#3a7d55', '#1a6e4a']));
+}
+
+// ─────────────────────────────────────────────
+// COMPARE
+// ─────────────────────────────────────────────
+function updateCompare() {
+  const a = document.getElementById('cmp-a')?.value;
+  const b = document.getElementById('cmp-b')?.value;
+  const c = document.getElementById('cmp-c')?.value;
+  const terrs = [a, b, c].filter(Boolean);
+  if (terrs.length < 2) return;
+
+  const years = [...new Set(filteredData.map(r => r.ano))].sort();
+  const COLORS = ['#b84535', '#3a7d55', '#607d6f'];
+  const RM_COLORS = ['#e07b31', '#1abc9c', '#8e44ad'];
+
+  function terrSeries(flux, colorArr) {
+    return terrs.map((t, i) => {
+      const byYear = {};
+      filteredData.filter(r => r.territorio_nome === t && r.tipo_fluxo === flux).forEach(r => byYear[r.ano] = (byYear[r.ano] || 0) + r.valor_co2e);
+      return { name: t, type: 'line', data: years.map(y => toMt(byYear[y] || 0)), smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: colorArr[i], width: 2.2 }, itemStyle: { color: colorArr[i] } };
+    });
+  }
+
+  const c1 = getOrCreateChart('chart-cmp-em');
+  if (c1) c1.setOption({ ...BASE_OPTS,
+    legend: { data: terrs, bottom: 0, textStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: terrSeries('Emissão', COLORS)
+  });
+
+  const c2 = getOrCreateChart('chart-cmp-rm');
+  if (c2) c2.setOption({ ...BASE_OPTS,
+    legend: { data: terrs, bottom: 0, textStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+    xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+    series: terrSeries('Remoção', RM_COLORS)
+  });
+
+  const c3 = getOrCreateChart('chart-cmp-bal');
+  if (c3) {
+    const balSeries = terrs.map((t, i) => {
+      const emByY = {}, rmByY = {};
+      filteredData.filter(r => r.territorio_nome === t && r.tipo_fluxo === 'Emissão').forEach(r => emByY[r.ano] = (emByY[r.ano] || 0) + r.valor_co2e);
+      filteredData.filter(r => r.territorio_nome === t && r.tipo_fluxo === 'Remoção').forEach(r => rmByY[r.ano] = (rmByY[r.ano] || 0) + r.valor_co2e);
+      return { name: t, type: 'line', data: years.map(y => toMt((rmByY[y] || 0) - (emByY[y] || 0))), smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: COLORS[i], width: 2.2 }, itemStyle: { color: COLORS[i] } };
+    });
+    c3.setOption({ ...BASE_OPTS,
+      legend: { data: terrs, bottom: 0, textStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' } },
+      xAxis: { type: 'category', data: years, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' } },
+      yAxis: { type: 'value', name: 'MtCO₂eq', nameTextStyle: { fontFamily: 'Source Sans 3', color: '#7a9475' }, axisLabel: { fontFamily: 'DM Mono', color: '#7a9475' }, splitLine: { lineStyle: { type: 'dashed' } } },
+      series: [...balSeries, { type: 'line', data: years.map(() => 0), lineStyle: { color: '#aaa', type: 'dashed', width: 1 }, symbol: 'none' }]
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// TABLE
+// ─────────────────────────────────────────────
+function renderTable() {
+  const rows = filteredData.slice(0, 500);
+  document.getElementById('table-count').textContent = filteredData.length;
+  document.getElementById('data-tbody').innerHTML = rows.map(r =>
+    `<tr>
+      <td>${r.ano}</td>
+      <td style="font-size:11px;color:#7a9475">${r.territorio_tipo || '—'}</td>
+      <td>${r.territorio_nome}</td>
+      <td>${r.bioma || '—'}</td>
+      <td>${r.estado || '—'}</td>
+      <td>${r.regiao || '—'}</td>
+      <td>${r.categoria}</td>
+      <td><span class="badge ${r.tipo_fluxo === 'Emissão' ? 'emission' : 'removal'}">${r.tipo_fluxo}</span></td>
+      <td style="font-family:'DM Mono',monospace">${r.valor_co2e?.toLocaleString('pt-BR')}</td>
+      <td>${r.fonte}</td>
+    </tr>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// EXPORT
+// ─────────────────────────────────────────────
+function exportCSV() {
+  const csv = Papa.unparse(filteredData);
+  downloadFile('emissoes_remocoes_filtrado.csv', csv, 'text/csv');
+  toast('CSV exportado');
+}
+
+function exportFilterConfig() {
+  const config = {
+    territorio_tipo: document.getElementById('f-terrtype').value,
+    territorio: document.getElementById('f-territory').value,
+    estado_regiao: document.getElementById('f-state').value,
+    bioma: document.getElementById('f-biome').value,
+    categoria: document.getElementById('f-category').value,
+    ano_inicio: document.getElementById('f-year-start').value,
+    ano_fim: document.getElementById('f-year-end').value,
+    tipo_fluxo: document.getElementById('f-flux').value,
+    registros_filtrados: filteredData.length,
+    exportado_em: new Date().toISOString()
+  };
+  downloadFile('filtros_dashboard.json', JSON.stringify(config, null, 2), 'application/json');
+  toast('Configuração exportada');
+}
+
+function downloadFile(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name;
+  a.click();
+}
+
+// ─────────────────────────────────────────────
+// REPORT
+// ─────────────────────────────────────────────
+function buildReportContent() {
+  const years = getYears();
+  const totalEm = totalFlux(filteredData, 'Emissão');
+  const totalRm = totalFlux(filteredData, 'Remoção');
+  const balance = totalRm - totalEm;
+  const emPct = pctChange(filteredData, 'Emissão');
+  const rmPct = pctChange(filteredData, 'Remoção');
+  const title = document.getElementById('rpt-title').value;
+  const now = new Date().toLocaleDateString('pt-BR');
+
+  const catEm = {};
+  filteredData.filter(r => r.tipo_fluxo === 'Emissão').forEach(r => catEm[r.categoria] = (catEm[r.categoria] || 0) + r.valor_co2e);
+  const topCatEm = Object.entries(catEm).sort((a, b) => b[1] - a[1])[0];
+
+  const terrEm = Object.entries(getByTerritory(filteredData, 'Emissão')).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const terrRm = Object.entries(getByTerritory(filteredData, 'Remoção')).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const interpretation = `No período analisado (${years[0]}–${years[years.length-1]}), as emissões totais foram de ${fmtMt(totalEm)}, com ${emPct >= 0 ? 'aumento' : 'redução'} de ${Math.abs(emPct).toFixed(1)}% ao longo do período. As remoções totalizaram ${fmtMt(totalRm)}, com ${rmPct >= 0 ? 'aumento' : 'redução'} de ${Math.abs(rmPct).toFixed(1)}%. O balanço líquido acumulado foi de ${fmtMt(balance)}, indicando que o território analisado atuou como ${balance >= 0 ? 'sumidouro líquido' : 'fonte líquida'} de carbono no período. ${topCatEm ? `A principal categoria de emissão foi "${topCatEm[0]}", responsável por ${fmtMt(topCatEm[1])}.` : ''}`;
+
+  document.getElementById('auto-interpret').textContent = interpretation;
+  return { title, now, years, totalEm, totalRm, balance, emPct, rmPct, terrEm, terrRm, interpretation };
+}
+
+function generateReport() {
+  const r = buildReportContent();
+
+  // Capture chart images from active ECharts instances
+  function chartImg(id) {
+    try {
+      const c = charts[id];
+      if (!c) return '';
+      const url = c.getDataURL({ type:'png', pixelRatio:2, backgroundColor:'#fffdf8' });
+      return `<img src="${url}" style="width:100%;border-radius:8px;border:1px solid #d6cdb8;margin-bottom:8px" />`;
+    } catch(e) { return ''; }
+  }
+
+  // YbYrá logo SVG (inline, for report header)
+  const logoSvg = `<svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 32 Q8 29 12 32 Q16 35 20 32 Q24 29 28 32 Q32 35 36 32" stroke="#3a7d55" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+    <path d="M20 30 L20 18" stroke="#c8903a" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M20 24 Q14 20 10 16" stroke="#5aad7a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <path d="M20 24 Q26 20 30 16" stroke="#5aad7a" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <circle cx="10" cy="15" r="3" fill="#3a7d55" opacity=".85"/>
+    <circle cx="20" cy="7" r="3" fill="#2d5c3f"/>
+    <circle cx="30" cy="15" r="3" fill="#3a7d55" opacity=".85"/>
+  </svg>`;
+
+  const balColor  = r.balance >= 0 ? '#2d5c3f' : '#b84535';
+  const balBg     = r.balance >= 0 ? '#eef5f0' : '#f8ece9';
+
+  document.getElementById('report-preview').innerHTML = `
+    <!-- REPORT HEADER -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px">
+      ${logoSvg}
+      <div>
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:26px;font-weight:700;color:#12261a;line-height:1">${r.title}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:#7a9475;margin-top:3px">YbYrá-BR · Carbono Florestal Brasileiro · ${r.now}</div>
+      </div>
+    </div>
+    <div style="height:2px;background:linear-gradient(90deg,#3a7d55,#c8903a,#b84535);border-radius:2px;margin-bottom:22px"></div>
+
+    <!-- KPI CARDS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:22px">
+      <div style="background:#f8ece9;border-radius:10px;padding:14px;border-left:3px solid #b84535">
+        <div style="font-size:10px;font-weight:600;color:#b84535;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Emissões Totais</div>
+        <div style="font-family:'DM Mono',monospace;font-size:22px;color:#b84535">${fmtMt(r.totalEm)}</div>
+        <div style="font-size:11px;color:#a06030;margin-top:3px">${r.years[0]}–${r.years[r.years.length-1]}</div>
+      </div>
+      <div style="background:#eef5f0;border-radius:10px;padding:14px;border-left:3px solid #3a7d55">
+        <div style="font-size:10px;font-weight:600;color:#2d5c3f;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Remoções Totais</div>
+        <div style="font-family:'DM Mono',monospace;font-size:22px;color:#2d5c3f">${fmtMt(r.totalRm)}</div>
+        <div style="font-size:11px;color:#5aad7a;margin-top:3px">${r.years[0]}–${r.years[r.years.length-1]}</div>
+      </div>
+      <div style="background:${balBg};border-radius:10px;padding:14px;border-left:3px solid ${balColor}">
+        <div style="font-size:10px;font-weight:600;color:${balColor};text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Balanço Líquido</div>
+        <div style="font-family:'DM Mono',monospace;font-size:22px;color:${balColor}">${fmtMt(r.balance)}</div>
+        <div style="font-size:11px;color:${balColor};margin-top:3px;opacity:.7">${r.balance>=0?'Sumidouro líquido':'Fonte líquida'}</div>
+      </div>
+    </div>
+
+    <!-- RESUMO EXECUTIVO -->
+    <div style="margin-bottom:22px">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;font-weight:600;color:#12261a;margin-bottom:8px">Resumo Executivo</div>
+      <div style="font-size:13px;color:#4a5e45;line-height:1.8;padding:14px 16px;background:#f5f0e8;border-radius:8px;border-left:3px solid #3a7d55">${r.interpretation}</div>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div style="margin-bottom:22px">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;font-weight:600;color:#12261a;margin-bottom:12px">Visualizações</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Série Temporal — Emissões & Remoções</div>
+          ${chartImg('chart-timeseries')}
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Balanço Líquido por Ano</div>
+          ${chartImg('chart-balance')}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Emissões por Categoria</div>
+          ${chartImg('chart-emission-stacked')}
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Contribuição % — Emissões</div>
+          ${chartImg('chart-em-pie')}
+        </div>
+      </div>
+    </div>
+
+    <!-- TABELAS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px">
+      <div>
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;font-weight:600;color:#12261a;margin-bottom:10px">Top Emissores</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="background:#ede7d9"><th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em">Território</th><th style="padding:8px 10px;text-align:right;font-size:10px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em">MtCO₂e</th></tr></thead>
+          <tbody>${r.terrEm.map(([n,v],i)=>`<tr style="border-bottom:1px solid #ede7d9"><td style="padding:7px 10px;color:#1a2416">${n}</td><td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:#b84535">${fmtMt(v)}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div>
+        <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;font-weight:600;color:#12261a;margin-bottom:10px">Top Removedores</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="background:#ede7d9"><th style="padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em">Território</th><th style="padding:8px 10px;text-align:right;font-size:10px;font-weight:600;color:#7a9475;text-transform:uppercase;letter-spacing:.05em">MtCO₂e</th></tr></thead>
+          <tbody>${r.terrRm.map(([n,v],i)=>`<tr style="border-bottom:1px solid #ede7d9"><td style="padding:7px 10px;color:#1a2416">${n}</td><td style="padding:7px 10px;text-align:right;font-family:'DM Mono',monospace;color:#2d5c3f">${fmtMt(v)}</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="border-top:1px solid #d6cdb8;padding-top:12px;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;color:#7a9475">YbYrá-BR · Carbono Florestal Brasileiro · v1.0 · ${r.years[0]}–${r.years[r.years.length-1]}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:10.5px;color:#a8c9b4">${filteredData.length} registros · celsohlsj@gmail.com</div>
+    </div>
+  `;
+}
+
+function exportReportMarkdown() {
+  const r = buildReportContent();
+  const md = `# ${r.title}\n\n> Gerado em ${r.now} · Brasil Carbon Dashboard v1.0\n\n## Resumo Executivo\n\n${r.interpretation}\n\n## Indicadores Principais\n\n| Indicador | Valor |\n|---|---|\n| Emissões Totais | ${fmtMt(r.totalEm)} |\n| Remoções Totais | ${fmtMt(r.totalRm)} |\n| Balanço Líquido | ${fmtMt(r.balance)} |\n| Variação Emissões | ${r.emPct.toFixed(1)}% |\n| Variação Remoções | ${r.rmPct.toFixed(1)}% |\n\n## Top Emissores\n\n${r.terrEm.map(([n,v]) => `- **${n}**: ${fmtMt(v)}`).join('\n')}\n\n## Top Removedores\n\n${r.terrRm.map(([n,v]) => `- **${n}**: ${fmtMt(v)}`).join('\n')}\n\n---\n\n*Fonte: YbYrá-BR · Período: ${r.years[0]}–${r.years[r.years.length-1]}*\n`;
+  downloadFile('relatorio_carbono_brasil.md', md, 'text/markdown');
+  toast('Relatório Markdown exportado');
+}
+
+function exportReportHTML() {
+  generateReport();
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/><title>${document.getElementById('rpt-title').value}</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;color:var(--ink);line-height:1.6}</style></head><body>${document.getElementById('report-preview').innerHTML}</body></html>`;
+  downloadFile('relatorio_carbono_brasil.html', html, 'text/html');
+  toast('Relatório HTML exportado');
+}
+
+function exportReportPDF() {
+  generateReport();
+  toast('Para PDF: use Ctrl+P → Salvar como PDF no relatório. Abrindo HTML…');
+  setTimeout(exportReportHTML, 500);
+}
+
+// ─────────────────────────────────────────────
+// LOAD EXTERNAL CSV
+// ─────────────────────────────────────────────
+function loadExternalCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    loadData(e.target.result);
+    toast(`Dados carregados: ${file.name}`);
+  };
+  reader.readAsText(file);
+}
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadData(DEMO_CSV);
+  window.addEventListener('resize', () => {
+    Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
+  });
+});
+</script>
+</body>
+</html>
