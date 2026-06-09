@@ -1,501 +1,343 @@
-// =============================================================================
-// YbYrá-BR | Export Emissions & Removals — Municipality × Biome
-// Dashboard feeder script — v1.2
-//
-// CHANGELOG v1.2 (alinhado ao pipeline emissions_removals_v1_2):
-//   • Fonte: emissions_removals_v1_2  (antes: v1_1)
-//   • sl_co2 → logging_co2  (nome de banda atualizado)
-//   • total_primary_co2 = edge + logging + fire + defor
-//   • Novas colunas: logging_co2, logging_n
-//   • net_balance_co2 = total_primary_co2 + defor_sf_co2 − removal_sf_co2
-//
-// ASSET DE MUNICÍPIOS:
-//   O script usa FAO/GAUL/2015/level2 (dataset público, sempre disponível).
-//   Se você tem acesso ao MapBiomas workspace, descomente a OPÇÃO A ou B
-//   no bloco de configuração abaixo para obter códigos IBGE oficiais (CD_MUN).
-//
-// ─────────────────────────────────────────────────────────────────────────────
-// DIAGNÓSTICO: rode este bloco para descobrir assets disponíveis no seu projeto
-// ─────────────────────────────────────────────────────────────────────────────
-// var assets = ee.data.listAssets('projects/mapbiomas-workspace/AUXILIAR');
-// print('Assets disponíveis:', assets);
-//
-// Se encontrar o asset de municípios, substitua o caminho na OPÇÃO A abaixo
-// e troque o bloco de municípios para usar os campos corretos (CD_MUN, NM_MUN,
-// NM_UF, SIGLA_UF), removendo o bloco de normalização GAUL.
-// =============================================================================
-//
-// Bandas disponíveis na coleção v1_2 (Mg CO₂ pixel⁻¹ yr⁻¹):
-//   edge_co2         — efeito de borda
-//   logging_co2      — corte seletivo  [p(n) = 0.196 × exp(−0.0782 × (n−1))]
-//   fire_co2         — fogo
-//   defor_co2        — desmatamento floresta primária
-//   total_primary_co2 — soma dos quatro acima
-//   defor_sf_co2     — desmatamento floresta secundária
-//   removal_sf_co2   — remoção floresta secundária
-//   agc_sf_co2       — estoque AGC floresta secundária (Mg CO₂ pixel⁻¹)
-//   logging_n        — ordem de recorrência do evento de corte (1,2,3...)
-//
-// Saída (Google Drive — pasta YbYrá-BR_Dashboard):
-//   ybyra_emiss_mun_YYYY.csv    — por município (1 arquivo por ano)
-//   ybyra_emiss_biome_YYYY.csv  — por bioma     (1 arquivo por ano)
-//
-// Colunas do CSV de municípios:
-//   year, CD_MUN, NM_MUN, NM_UF, SIGLA_UF, NM_REGIAO, Bioma,
-//   edge_co2, logging_co2, fire_co2, defor_co2, total_primary_co2,
-//   defor_sf_co2, removal_sf_co2, agc_sf_co2,
-//   net_balance_co2, logging_n_mean, pixel_area_ha
-//
-// Colunas do CSV de biomas:
-//   year, Bioma,
-//   edge_co2, logging_co2, fire_co2, defor_co2, total_primary_co2,
-//   defor_sf_co2, removal_sf_co2, agc_sf_co2,
-//   net_balance_co2, logging_n_mean, pixel_area_ha
-//
-// Estratégia de memória:
-//   scale = 500 m → erro < 0.5% para somas regionais
-//   tileScale = 16 → evita OOM em geometrias grandes
-//   loop client-side por ano → 1 task por ano por recorte
-//
-// Autores: YbYrá-BR
-// Versão: 1.2 — 2025
-// =============================================================================
+/**
+ * =============================================================================
+ * PROJETO  : YbYrá-BR — Estatísticas Pré-calculadas por Território
+ * VERSAO   : v1_2
+ * SCRIPT   : ybyra_precalc_statistics_v1_2.js
+ *
+ * RECORTES TERRITORIAIS (7 grupos, 33 exports total):
+ *   1. Brasil        — 1 CSV
+ *   2. Biomas        — 1 CSV
+ *   3. Estados       — 1 CSV
+ *   4. TIs           — 1 CSV
+ *   5. UCs           — 1 CSV
+ *   6. Quilombos     — 1 CSV
+ *   7. Municípios    — 27 CSVs (1 por estado)
+ *
+ * ARQUITETURA — 100% SERVER-SIDE (sem evaluate()):
+ *   O problema com evaluate() + forEach é que o GEE Code Editor
+ *   executa as chamadas de forma assíncrona e pode silenciosamente
+ *   não disparar todos os exports, especialmente para FCs grandes.
+ *
+ *   Solução: todo o reshape wide → long é feito server-side:
+ *     1. Para cada Feature da FC (polígono), gera 39 sub-Features
+ *        (um por ano) via ee.FeatureCollection.map() + ee.List.map()
+ *     2. O flatten() junta tudo em uma FC long pronta para Export
+ *     3. Export.table.toDrive() é chamado diretamente — sem callbacks
+ *
+ *   Desvantagem: a FC long pode ser grande (ex.: 5570 municípios × 39 anos
+ *   = 217.230 features), mas o GEE lida bem com isso em Export.
+ *
+ * MÉTRICAS (por território × ano):
+ *   total_primary_co2 | edge_co2 | logging_co2 | fire_co2 | defor_co2 |
+ *   removal_sf_co2 | defor_sf_co2 | agc_sf_co2 | net_co2
+ *   net_co2 = total_primary_co2 + defor_sf_co2 − removal_sf_co2
+ *
+ * SAÍDAS (Google Drive — pasta 'YbYraBR_Statistics'):
+ *   YbYraBR_brasil_v1_2.csv
+ *   YbYraBR_biomas_v1_2.csv
+ *   YbYraBR_estados_v1_2.csv
+ *   YbYraBR_terras_indigenas_v1_2.csv
+ *   YbYraBR_unidades_conservacao_v1_2.csv
+ *   YbYraBR_quilombos_v1_2.csv
+ *   municipios/YbYraBR_municipios_uf<ID>_v1_2.csv  (27 arquivos)
+ *
+ * COLUNAS:
+ *   id_territorio | nome_territorio | Ano | area_ha |
+ *   total_primary_co2 | edge_co2 | logging_co2 | fire_co2 | defor_co2 |
+ *   removal_sf_co2 | defor_sf_co2 | agc_sf_co2 | net_co2
+ *
+ * -----------------------------------------------------------------------------
+ * INSTITUICAO : IPAM Amazônia
+ * PROJETO     : YbYrá-BR (CNPq 401741/2023-0)
+ * RESPONSAVEL : Celso H. L. Silva-Junior
+ * ATUALIZACAO : 2026-06-09
+ * =============================================================================
+ */
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 0. CONFIGURAÇÃO
-// ─────────────────────────────────────────────────────────────────────────────
-var START_YEAR   = 1986;
-var END_YEAR     = 2024;
-var SCALE        = 500;
-var TILE_SCALE   = 16;
-var DRIVE_FOLDER = 'YbYrá-BR_Dashboard';
 
-// RUN_MODE: 'MUNICIPALITY' | 'BIOME' | 'BOTH'
-// Recomendação: rode 'BIOME' primeiro para validar, depois 'MUNICIPALITY' em
-// blocos de 10 anos (ex: 1986-1995, 1996-2005, 2006-2015, 2016-2024)
-var RUN_MODE = 'BIOME';
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. PARÂMETROS GLOBAIS
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. ASSETS
-// ─────────────────────────────────────────────────────────────────────────────
+var IC_ASSET      = 'projects/ee-redd-brazil/assets/ybyra-br-model/emissions_removals_v1_2';
+var MB_BASE       = 'projects/mapbiomas-territories/assets/TERRITORIES-OLD/LULC/BRAZIL/COLLECTION9/WORKSPACE/';
+var VERSION       = 'v1_2';
+var EXPORT_FOLDER = 'YbYraBR_Statistics';
+var EXPORT_SCALE  = 30;
+var TILE_SCALE    = 4;   // aumentar para 8 se OOM em TIs / quilombos
 
-// Coleção principal — v1_2 (inclui logging_co2)
-var col = ee.ImageCollection(
-  'projects/ee-redd-brazil/assets/ybyra-br-model/emissions_removals_v1_2'
+var YEARS = ee.List([
+  '1986','1987','1988','1989','1990','1991','1992','1993','1994','1995',
+  '1996','1997','1998','1999','2000','2001','2002','2003','2004','2005',
+  '2006','2007','2008','2009','2010','2011','2012','2013','2014','2015',
+  '2016','2017','2018','2019','2020','2021','2022','2023','2024'
+]);
+
+// Para selectors do Export (JS puro, não ee.List)
+var YEARS_JS = [
+  '1986','1987','1988','1989','1990','1991','1992','1993','1994','1995',
+  '1996','1997','1998','1999','2000','2001','2002','2003','2004','2005',
+  '2006','2007','2008','2009','2010','2011','2012','2013','2014','2015',
+  '2016','2017','2018','2019','2020','2021','2022','2023','2024'
+];
+
+var DRIVER_BANDS = [
+  'total_primary_co2',
+  'edge_co2',
+  'logging_co2',
+  'fire_co2',
+  'defor_co2',
+  'removal_sf_co2',
+  'defor_sf_co2',
+  'agc_sf_co2'
+];
+var ALL_METRICS = DRIVER_BANDS.concat(['net_co2']);
+
+var SELECTORS = ['id_territorio', 'nome_territorio', 'Ano', 'area_ha']
+                .concat(ALL_METRICS);
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. ASSETS DE TERRITÓRIO
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var ic        = ee.ImageCollection(IC_ASSET);
+var biomas_fc = ee.FeatureCollection('projects/mapbiomas-workspace/AUXILIAR/biomas_IBGE_250mil');
+
+var fc_biomas  = biomas_fc;
+var fc_estados = ee.FeatureCollection(MB_BASE + 'POLITICAL_LEVEL_2');
+var fc_tis     = ee.FeatureCollection(MB_BASE + 'INDIGENOUS_TERRITORIES');
+var fc_ucs     = ee.FeatureCollection(MB_BASE + 'PROTECTED_AREA');
+var fc_quilomb = ee.FeatureCollection(MB_BASE + 'QUILOMBOS');
+var fc_munic   = ee.FeatureCollection(MB_BASE + 'POLITICAL_LEVEL_3');
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. IMAGENS ANUAIS PRÉ-CARREGADAS
+//    Dicionário server-side: ano (string) → Image com métricas + net_co2
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Dicionário ee: chave = ano string, valor = Image
+var imgByYear = ee.Dictionary(
+  YEARS.iterate(function(yr, acc) {
+    yr = ee.String(yr);
+    var img = ee.Image(ic.filter(ee.Filter.eq('system:index', yr)).first());
+    var net = img.select('total_primary_co2')
+                 .add(img.select('defor_sf_co2'))
+                 .subtract(img.select('removal_sf_co2'))
+                 .rename('net_co2');
+    var full = img.select(DRIVER_BANDS).addBands(net).float();
+    return ee.Dictionary(acc).set(yr, full);
+  }, ee.Dictionary({}))
 );
 
-// =============================================================================
-// MUNICÍPIOS — asset IBGE via GAUL / FAO ou alternativas públicas no GEE
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. FUNÇÃO CORE — buildLongFC
 //
-// Opções em ordem de preferência (descomente apenas uma):
+//    Recebe uma FeatureCollection de polígonos, idProp e nameProp.
+//    Para cada Feature × Ano:
+//      - Calcula area_ha via pixelArea
+//      - Soma cada driver dentro do polígono (reduceRegion)
+//      - Gera um Feature com as colunas no formato long
+//    Retorna: ee.FeatureCollection pronta para Export
 //
-// OPÇÃO A — IBGE 2022 via projeto ee-redd-brazil (recomendado se você tem acesso)
-//   'projects/ee-redd-brazil/assets/auxiliar/municipios_brasil_2022'
-//
-// OPÇÃO B — MapBiomas workspace (requer acesso ao workspace)
-//   'projects/mapbiomas-workspace/AUXILIAR/municipios_2022'
-//
-// OPÇÃO C — FAO GAUL Level 2 (público, sem necessidade de acesso especial)
-//   ee.FeatureCollection('FAO/GAUL/2015/level2').filter(ee.Filter.eq('ADM0_NAME','Brazil'))
-//   Campos: ADM2_NAME (município), ADM1_NAME (estado), ADM2_CODE
-//
-// OPÇÃO D — IBGE via asset público do TerraBrasilis / MapBiomas público
-//   'projects/mapbiomas-public/assets/territories/territories_2022'
-//   filter: territorio_tipo == 'municipio'  (se disponível)
-//
-// ── USANDO OPÇÃO C (FAO GAUL) — SEMPRE DISPONÍVEL NO GEE ─────────────────────
-// Campos: ADM2_NAME → NM_MUN, ADM1_NAME → NM_UF, ADM2_CODE → CD_MUN
-// =============================================================================
+//    Estratégia: map() sobre a FC, e dentro de cada Feature map() sobre YEARS.
+//    Assim tudo é lazy/server-side — nenhum evaluate() necessário.
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Municípios do Brasil — FAO GAUL Level 2 (dataset público)
-var gaul2 = ee.FeatureCollection('FAO/GAUL/2015/level2')
-              .filter(ee.Filter.eq('ADM0_NAME', 'Brazil'));
+function buildLongFC(fc, idProp, nameProp) {
 
-// Normalizar campos para o padrão do pipeline
-var municipalities = gaul2.map(function(feat) {
-  return feat.set({
-    'CD_MUN':  feat.get('ADM2_CODE'),   // código numérico GAUL
-    'NM_MUN':  feat.get('ADM2_NAME'),   // nome do município
-    'NM_UF':   feat.get('ADM1_NAME'),   // nome do estado
-    'SIGLA_UF': ''                       // GAUL não tem sigla — preenchida abaixo
-  });
-});
+  var longFC = fc.map(function(feat) {
 
-// Mapa nome do estado → sigla UF (necessário pois GAUL usa nome completo)
-var ESTADO_SIGLA = ee.Dictionary({
-  'Acre':'AC','Alagoas':'AL','Amapá':'AP','Amazonas':'AM','Bahia':'BA',
-  'Ceará':'CE','Distrito Federal':'DF','Espírito Santo':'ES','Goiás':'GO',
-  'Maranhão':'MA','Mato Grosso':'MT','Mato Grosso do Sul':'MS',
-  'Minas Gerais':'MG','Pará':'PA','Paraíba':'PB','Paraná':'PR',
-  'Pernambuco':'PE','Piauí':'PI','Rio de Janeiro':'RJ',
-  'Rio Grande do Norte':'RN','Rio Grande do Sul':'RS','Rondônia':'RO',
-  'Roraima':'RR','Santa Catarina':'SC','São Paulo':'SP',
-  'Sergipe':'SE','Tocantins':'TO'
-});
+    var geom  = feat.geometry();
+    var tid   = feat.get(idProp);
+    var tname = feat.get(nameProp);
 
-municipalities = municipalities.map(function(feat) {
-  var nmUF  = feat.getString('NM_UF');
-  var sigla = ESTADO_SIGLA.get(nmUF, 'ZZ');
-  return feat.set('SIGLA_UF', sigla);
-});
+    // Para cada ano: reduz todos os drivers dentro do polígono
+    var yearFeats = YEARS.map(function(yr) {
+      yr = ee.String(yr);
+      var img = ee.Image(imgByYear.get(yr));
 
-print('Municípios (GAUL amostra):', municipalities.limit(3));
-print('Total municípios:', municipalities.size());
+      // Área em ha
+      var areaHa = ee.Image.pixelArea().divide(1e4)
+                     .reduceRegion({
+                       reducer  : ee.Reducer.sum(),
+                       geometry : geom,
+                       scale    : EXPORT_SCALE,
+                       maxPixels: 1e13,
+                       tileScale: TILE_SCALE
+                     }).getNumber('area');
 
-// Biomas IBGE 1:250.000
-var biomesFC = ee.FeatureCollection(
-  'projects/mapbiomas-workspace/AUXILIAR/biomas_IBGE_250mil'
-).select(['Bioma']);
+      // Soma de cada driver
+      var sums = img.reduceRegion({
+        reducer  : ee.Reducer.sum(),
+        geometry : geom,
+        scale    : EXPORT_SCALE,
+        maxPixels: 1e13,
+        tileScale: TILE_SCALE
+      });
 
-// Bioma rasterizado → usar código numérico (reduceToImage só aceita números)
-// String fields causam: "Reducer input must be a number"
-var BIOME_CODES = ee.Dictionary({
-  'Amazônia':       1,
-  'Cerrado':        2,
-  'Mata Atlântica': 3,
-  'Caatinga':       4,
-  'Pampa':          5,
-  'Pantanal':       6
-});
-var BIOME_NAMES = ee.Dictionary({
-  '1': 'Amazônia',
-  '2': 'Cerrado',
-  '3': 'Mata Atlântica',
-  '4': 'Caatinga',
-  '5': 'Pampa',
-  '6': 'Pantanal'
-});
+      return ee.Feature(null, {
+        'id_territorio'   : tid,
+        'nome_territorio' : tname,
+        'Ano'             : ee.Number.parse(yr),
+        'area_ha'         : areaHa,
+        'total_primary_co2': sums.getNumber('total_primary_co2'),
+        'edge_co2'        : sums.getNumber('edge_co2'),
+        'logging_co2'     : sums.getNumber('logging_co2'),
+        'fire_co2'        : sums.getNumber('fire_co2'),
+        'defor_co2'       : sums.getNumber('defor_co2'),
+        'removal_sf_co2'  : sums.getNumber('removal_sf_co2'),
+        'defor_sf_co2'    : sums.getNumber('defor_sf_co2'),
+        'agc_sf_co2'      : sums.getNumber('agc_sf_co2'),
+        'net_co2'         : sums.getNumber('net_co2')
+      });
+    }); // fim YEARS.map
 
-// Adiciona campo numérico ao FeatureCollection de biomas antes de rasterizar
-var biomesNumeric = biomesFC.map(function(feat) {
-  var code = ee.Number(BIOME_CODES.get(feat.getString('Bioma'), 0));
-  return feat.set('bioma_code', code);
-});
+    return ee.FeatureCollection(yearFeats);
 
-var biomeImg = biomesNumeric.reduceToImage({
-  properties: ['bioma_code'],
-  reducer: ee.Reducer.first()
-}).rename('bioma_code');
+  }).flatten(); // achata FC de FCs → FC plana
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. LOOKUP: UF → Região
-// ─────────────────────────────────────────────────────────────────────────────
-var REGIAO_MAP = ee.Dictionary({
-  'AC':'Norte',   'AP':'Norte',   'AM':'Norte',   'PA':'Norte',
-  'RO':'Norte',   'RR':'Norte',   'TO':'Norte',
-  'AL':'Nordeste','BA':'Nordeste','CE':'Nordeste','MA':'Nordeste',
-  'PB':'Nordeste','PE':'Nordeste','PI':'Nordeste','RN':'Nordeste',
-  'SE':'Nordeste',
-  'DF':'Centro-Oeste','GO':'Centro-Oeste','MT':'Centro-Oeste','MS':'Centro-Oeste',
-  'ES':'Sudeste', 'MG':'Sudeste', 'RJ':'Sudeste', 'SP':'Sudeste',
-  'PR':'Sul',     'RS':'Sul',     'SC':'Sul'
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 3. MUNICÍPIOS — adicionar bioma dominante e região
-// ─────────────────────────────────────────────────────────────────────────────
-var munWithBiome = municipalities.map(function(feat) {
-  // Extrai código numérico do bioma dominante (modo espacial)
-  var code = biomeImg.reduceRegion({
-    reducer:  ee.Reducer.mode(),
-    geometry: feat.geometry(),
-    scale:    500,
-    maxPixels: 1e9
-  }).get('bioma_code');
-
-  // Converte código → nome do bioma (via dicionário server-side)
-  var codeStr   = ee.Number(code).int().format('%d');
-  var biomeName = ee.String(BIOME_NAMES.get(codeStr, 'Outros'));
-  return feat.set('Bioma', biomeName);
-});
-
-var munReady = munWithBiome.map(function(feat) {
-  var sigla  = feat.getString('SIGLA_UF');
-  var regiao = REGIAO_MAP.get(sigla, 'N/A');
-  return feat.set('NM_REGIAO', regiao);
-});
-
-print('Municípios prontos (amostra):', munReady.limit(3));
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. UTILITÁRIO — banda segura com fallback zero
-// ─────────────────────────────────────────────────────────────────────────────
-// Necessário porque logging_co2 pode não existir em anos anteriores a 1988
-function safeBand(img, bandName) {
-  var hasBand = img.bandNames().contains(bandName);
-  return ee.Image(ee.Algorithms.If(
-    hasBand,
-    img.select(bandName),
-    ee.Image.constant(0).rename(bandName)
-  ));
+  return longFC;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. EXPORTAÇÃO POR MUNICÍPIO
-// ─────────────────────────────────────────────────────────────────────────────
-function exportByMunicipality(year) {
-  var yr    = ee.Number(year).toInt();
-  var yrStr = ee.String(yr);
 
-  var img = col.filter(ee.Filter.eq('year', yr)).first();
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. FUNÇÃO DE EXPORT
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  // Bandas de emissão — logging_co2 substitui sl_co2 na v1_2
-  var edge_co2    = safeBand(img, 'edge_co2');
-  var logging_co2 = safeBand(img, 'logging_co2');   // NEW v1.2
-  var fire_co2    = safeBand(img, 'fire_co2');
-  var defor_co2   = safeBand(img, 'defor_co2');
-  var defor_sf    = safeBand(img, 'defor_sf_co2');
-  var removal_sf  = safeBand(img, 'removal_sf_co2');
-  var agc_sf      = safeBand(img, 'agc_sf_co2');
-  var logging_n   = safeBand(img, 'logging_n');      // NEW v1.2 — recorrência média
-
-  // total_primary já calculado pelo pipeline; recalcular garante consistência
-  var total_primary = edge_co2.add(logging_co2).add(fire_co2).add(defor_co2)
-                               .rename('total_primary_co2');
-
-  // Balanço líquido: emissões primárias + emissão SF − remoção SF
-  var net_balance = total_primary.add(defor_sf).subtract(removal_sf)
-                                  .rename('net_balance_co2');
-
-  // Área total de pixels válidos (ha)
-  var pixelArea_ha = ee.Image.pixelArea().divide(10000).rename('pixel_area_ha');
-
-  var stack = edge_co2
-    .addBands(logging_co2)
-    .addBands(fire_co2)
-    .addBands(defor_co2)
-    .addBands(total_primary)
-    .addBands(defor_sf)
-    .addBands(removal_sf)
-    .addBands(agc_sf)
-    .addBands(net_balance)
-    .addBands(logging_n)
-    .addBands(pixelArea_ha);
-
-  // reduceRegions — soma para emissões, média para logging_n
-  var reduced = stack
-    .select(['edge_co2','logging_co2','fire_co2','defor_co2',
-             'total_primary_co2','defor_sf_co2','removal_sf_co2',
-             'agc_sf_co2','net_balance_co2','pixel_area_ha'])
-    .reduceRegions({
-      collection: munReady,
-      reducer:    ee.Reducer.sum(),
-      scale:      SCALE,
-      tileScale:  TILE_SCALE
-    });
-
-  // Média de logging_n separada (sum não faz sentido para ordem de evento)
-  var reducedN = stack.select(['logging_n']).reduceRegions({
-    collection: munReady,
-    reducer:    ee.Reducer.mean(),
-    scale:      SCALE,
-    tileScale:  TILE_SCALE
+function exportTerritory(fc, idProp, nameProp, key, folder) {
+  var longFC = buildLongFC(fc, idProp, nameProp);
+  var desc   = 'YbYraBR_' + key + '_' + VERSION;
+  Export.table.toDrive({
+    collection    : longFC,
+    description   : desc,
+    fileNamePrefix: desc,
+    fileFormat    : 'CSV',
+    folder        : folder || EXPORT_FOLDER,
+    selectors     : SELECTORS
   });
+  print('✓ Task submetida: ' + desc);
+}
 
-  // Junta logging_n_mean no resultado principal
-  var nDict = reducedN.reduceColumns(
-    ee.Reducer.toList(2), ['CD_MUN', 'logging_n']
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. EXPORTS — 1 a 6 (Brasil, Biomas, Estados, TIs, UCs, Quilombos)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── 1. BRASIL ─────────────────────────────────────────────────────────────────
+// Cria um Feature único com o dissolve dos biomas
+var brazil_feat = ee.Feature(
+  biomas_fc.geometry().dissolve(),
+  { 'id_territorio': 0, 'nome_territorio': 'Brasil' }
+);
+exportTerritory(
+  ee.FeatureCollection([brazil_feat]),
+  'id_territorio', 'nome_territorio',
+  'brasil'
+);
+
+// ── 2. BIOMAS ─────────────────────────────────────────────────────────────────
+exportTerritory(fc_biomas, 'CD_Bioma', 'Bioma', 'biomas');
+
+// ── 3. ESTADOS ────────────────────────────────────────────────────────────────
+exportTerritory(fc_estados, 'territoryId', 'territoryName', 'estados');
+
+// ── 4. TERRITÓRIOS INDÍGENAS ──────────────────────────────────────────────────
+exportTerritory(fc_tis, 'territoryId', 'territoryName', 'terras_indigenas');
+
+// ── 5. UNIDADES DE CONSERVAÇÃO ────────────────────────────────────────────────
+exportTerritory(fc_ucs, 'territoryId', 'territoryName', 'unidades_conservacao');
+
+// ── 6. QUILOMBOS ──────────────────────────────────────────────────────────────
+exportTerritory(fc_quilomb, 'territoryId', 'territoryName', 'quilombos');
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. EXPORT — MUNICÍPIOS (dividido por estado)
+//    ~5.570 polígonos × 39 anos = ~217k features por export inteiro.
+//    Dividir por stateId gera 27 tasks menores (~200 municípios × 39 = ~7800
+//    features cada), dentro dos limites de memória do GEE.
+//
+//    IDs dos estados (stateId = CD_GEOCUF):
+//    RO=11 AC=12 AM=13 RR=14 PA=15 AP=16 TO=17
+//    MA=21 PI=22 CE=23 RN=24 PB=25 PE=26 AL=27 SE=28 BA=29
+//    MG=31 ES=32 RJ=33 SP=35 PR=41 SC=42 RS=43
+//    MS=50 MT=51 GO=52 DF=53
+// ═══════════════════════════════════════════════════════════════════════════════
+
+var UF_IDS = [
+  11, 12, 13, 14, 15, 16, 17,
+  21, 22, 23, 24, 25, 26, 27, 28, 29,
+  31, 32, 33, 35,
+  41, 42, 43,
+  50, 51, 52, 53
+];
+
+UF_IDS.forEach(function(ufId) {
+  var fc_uf = fc_munic.filter(ee.Filter.eq('stateId', ufId));
+  exportTerritory(
+    fc_uf,
+    'territoryId', 'territoryName',
+    'municipios_uf' + ufId,
+    EXPORT_FOLDER + '/municipios'
   );
+});
 
-  var result = reduced.map(function(feat) {
-    return ee.Feature(null, {
-      year:              yr,
-      CD_MUN:            feat.get('CD_MUN'),
-      NM_MUN:            feat.get('NM_MUN'),
-      NM_UF:             feat.get('NM_UF'),
-      SIGLA_UF:          feat.get('SIGLA_UF'),
-      NM_REGIAO:         feat.get('NM_REGIAO'),
-      Bioma:             feat.get('Bioma'),
-      edge_co2:          feat.get('edge_co2'),
-      logging_co2:       feat.get('logging_co2'),
-      fire_co2:          feat.get('fire_co2'),
-      defor_co2:         feat.get('defor_co2'),
-      total_primary_co2: feat.get('total_primary_co2'),
-      defor_sf_co2:      feat.get('defor_sf_co2'),
-      removal_sf_co2:    feat.get('removal_sf_co2'),
-      agc_sf_co2:        feat.get('agc_sf_co2'),
-      net_balance_co2:   feat.get('net_balance_co2'),
-      pixel_area_ha:     feat.get('pixel_area_ha')
-    });
+print('✓ Municípios: ' + UF_IDS.length + ' tasks submetidas');
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 8. PRÉVIA NO CONSOLE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+print('═══ PRÉVIA: biomas × 2023 ═══');
+var yr_prev = '2023';
+var img_prev = ee.Image(imgByYear.get(yr_prev));
+
+var preview = img_prev
+  .addBands(ee.Image.pixelArea().divide(1e4).rename('area_ha'))
+  .reduceRegions({
+    collection: fc_biomas,
+    reducer   : ee.Reducer.sum(),
+    scale     : 10000,
+    tileScale : 2
   });
 
-  Export.table.toDrive({
-    collection:     result,
-    description:    'ybyra_emiss_mun_' + year,
-    folder:         DRIVE_FOLDER,
-    fileNamePrefix: 'ybyra_emiss_mun_' + year,
-    fileFormat:     'CSV',
-    selectors: [
-      'year','CD_MUN','NM_MUN','NM_UF','SIGLA_UF','NM_REGIAO','Bioma',
-      'edge_co2','logging_co2','fire_co2','defor_co2','total_primary_co2',
-      'defor_sf_co2','removal_sf_co2','agc_sf_co2',
-      'net_balance_co2','pixel_area_ha'
-    ]
-  });
-}
+print(preview.select(['Bioma', 'area_ha', 'total_primary_co2',
+                      'fire_co2', 'removal_sf_co2', 'net_co2']));
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. EXPORTAÇÃO POR BIOMA
-// ─────────────────────────────────────────────────────────────────────────────
-function exportByBiome(year) {
-  var yr    = ee.Number(year).toInt();
-  var yrStr = ee.String(yr);
 
-  var img = col.filter(ee.Filter.eq('year', yr)).first();
+// ═══════════════════════════════════════════════════════════════════════════════
+// 9. VISUALIZAÇÃO NO MAPA
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  var edge_co2    = safeBand(img, 'edge_co2');
-  var logging_co2 = safeBand(img, 'logging_co2');
-  var fire_co2    = safeBand(img, 'fire_co2');
-  var defor_co2   = safeBand(img, 'defor_co2');
-  var defor_sf    = safeBand(img, 'defor_sf_co2');
-  var removal_sf  = safeBand(img, 'removal_sf_co2');
-  var agc_sf      = safeBand(img, 'agc_sf_co2');
-  var logging_n   = safeBand(img, 'logging_n');
+var img2023 = ee.Image(imgByYear.get('2023'));
 
-  var total_primary = edge_co2.add(logging_co2).add(fire_co2).add(defor_co2)
-                               .rename('total_primary_co2');
-  var net_balance   = total_primary.add(defor_sf).subtract(removal_sf)
-                                    .rename('net_balance_co2');
-  var pixelArea_ha  = ee.Image.pixelArea().divide(10000).rename('pixel_area_ha');
-
-  var stack = edge_co2
-    .addBands(logging_co2)
-    .addBands(fire_co2)
-    .addBands(defor_co2)
-    .addBands(total_primary)
-    .addBands(defor_sf)
-    .addBands(removal_sf)
-    .addBands(agc_sf)
-    .addBands(net_balance)
-    .addBands(pixelArea_ha);
-
-  // ── Biomas individuais ────────────────────────────────────────────────────
-  var reducedBiomes = stack.reduceRegions({
-    collection: biomesFC,
-    reducer:    ee.Reducer.sum(),
-    scale:      SCALE,
-    tileScale:  TILE_SCALE
-  });
-
-  // ── Brasil total ──────────────────────────────────────────────────────────
-  var brazilGeom = biomesFC.geometry().dissolve({ maxError: 100 });
-  var brazilFeat = ee.Feature(brazilGeom, { 'Bioma': 'Brasil' });
-  var reducedBrazil = stack.reduceRegions({
-    collection: ee.FeatureCollection([brazilFeat]),
-    reducer:    ee.Reducer.sum(),
-    scale:      SCALE,
-    tileScale:  TILE_SCALE
-  });
-
-  var all = reducedBiomes.merge(reducedBrazil);
-
-  var result = all.map(function(feat) {
-    return ee.Feature(null, {
-      year:              yr,
-      Bioma:             feat.get('Bioma'),
-      edge_co2:          feat.get('edge_co2'),
-      logging_co2:       feat.get('logging_co2'),
-      fire_co2:          feat.get('fire_co2'),
-      defor_co2:         feat.get('defor_co2'),
-      total_primary_co2: feat.get('total_primary_co2'),
-      defor_sf_co2:      feat.get('defor_sf_co2'),
-      removal_sf_co2:    feat.get('removal_sf_co2'),
-      agc_sf_co2:        feat.get('agc_sf_co2'),
-      net_balance_co2:   feat.get('net_balance_co2'),
-      pixel_area_ha:     feat.get('pixel_area_ha')
-    });
-  });
-
-  Export.table.toDrive({
-    collection:     result,
-    description:    'ybyra_emiss_biome_' + year,
-    folder:         DRIVE_FOLDER,
-    fileNamePrefix: 'ybyra_emiss_biome_' + year,
-    fileFormat:     'CSV',
-    selectors: [
-      'year','Bioma',
-      'edge_co2','logging_co2','fire_co2','defor_co2','total_primary_co2',
-      'defor_sf_co2','removal_sf_co2','agc_sf_co2',
-      'net_balance_co2','pixel_area_ha'
-    ]
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. DISPARO DAS TASKS (loop client-side)
-// ─────────────────────────────────────────────────────────────────────────────
-// Recomendação de execução por blocos (municípios):
-//   Bloco 1: START=1986 END=1995
-//   Bloco 2: START=1996 END=2005
-//   Bloco 3: START=2006 END=2015
-//   Bloco 4: START=2016 END=2024
-//
-// Para biomas: pode rodar 1986-2024 de uma vez (7 biomas + Brasil = 8 linhas/ano)
-
-for (var y = START_YEAR; y <= END_YEAR; y++) {
-  if (RUN_MODE === 'MUNICIPALITY' || RUN_MODE === 'BOTH') exportByMunicipality(y);
-  if (RUN_MODE === 'BIOME'        || RUN_MODE === 'BOTH') exportByBiome(y);
-}
-
-print('Tasks configuradas:', (END_YEAR - START_YEAR + 1),
-      'anos ×',
-      RUN_MODE === 'BOTH' ? '2 recortes' : '1 recorte');
-print('Coleta de origem: emissions_removals_v1_2');
-print('Verifique a aba Tasks e submeta as exportações.');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 8. VISUALIZAÇÃO DE DIAGNÓSTICO (último ano)
-// ─────────────────────────────────────────────────────────────────────────────
-var imgDebug = col.filter(ee.Filter.eq('year', END_YEAR)).first();
-Map.centerObject(biomesFC, 4);
-Map.setOptions('HYBRID');
-
+Map.centerObject(biomas_fc, 4);
 Map.addLayer(
-  imgDebug.select('defor_co2'),
-  { min:0, max:1e8, palette:['#f7f7f7','#fee0d2','#fc9272','#de2d26','#a50f15'] },
-  'Desmatamento CO₂ ' + END_YEAR
+  img2023.select('total_primary_co2').updateMask(img2023.select('total_primary_co2').gt(0)),
+  { min: 0, max: 50, palette: ['ffffcc','ffeda0','feb24c','f03b20','bd0026'] },
+  'Total emissões primárias 2023', false
 );
 Map.addLayer(
-  imgDebug.select('logging_co2'),
-  { min:0, max:3e7, palette:['#f7fbff','#c6dbef','#6baed6','#2171b5','#084594'] },
-  'Corte seletivo CO₂ ' + END_YEAR
+  img2023.select('fire_co2').updateMask(img2023.select('fire_co2').gt(0)),
+  { min: 0, max: 20, palette: ['fff7bc','fec44f','d95f0e'] },
+  'Fogo 2023', false
 );
 Map.addLayer(
-  imgDebug.select('fire_co2'),
-  { min:0, max:5e7, palette:['#fff7ec','#fee8c8','#fdbb84','#e34a33','#b30000'] },
-  'Fogo CO₂ ' + END_YEAR
+  img2023.select('removal_sf_co2').updateMask(img2023.select('removal_sf_co2').gt(0)),
+  { min: 0, max: 10, palette: ['f7fcf5','74c476','006d2c'] },
+  'Remoção SF 2023', false
 );
 Map.addLayer(
-  imgDebug.select('removal_sf_co2'),
-  { min:0, max:3e7, palette:['#f7fcf5','#c7e9c0','#74c476','#238b45','#00441b'] },
-  'Remoção FS CO₂ ' + END_YEAR
+  img2023.select('net_co2'),
+  { min: -5, max: 50, palette: ['1a9641','ffffbf','d7191c'] },
+  'Balanço líquido 2023', false
 );
 Map.addLayer(
-  imgDebug.select('logging_n'),
-  { min:1, max:5, palette:['#ffffb2','#fecc5c','#fd8d3c','#f03b20','#bd0026'] },
-  'Corte seletivo — n recorrências ' + END_YEAR,
-  false
+  ee.Image().paint(biomas_fc, 0, 1.5),
+  { palette: ['ffffff'] },
+  'Biomas (contorno)', true
 );
-Map.addLayer(
-  biomesFC.style({ color:'#1a1a1a', width:1, fillColor:'00000000' }),
-  {}, 'Biomas IBGE'
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTAS DE INTEGRAÇÃO COM O DASHBOARD
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// MAPEAMENTO CSV → DASHBOARD (categoria no dashboard):
-//   defor_co2      → categoria = 'Desmatamento',    subcategoria = 'Floresta primária',   tipo_fluxo = 'Emissão'
-//   logging_co2    → categoria = 'Corte seletivo',  subcategoria = 'Exploração madeireira',tipo_fluxo = 'Emissão'
-//   fire_co2       → categoria = 'Fogo',            subcategoria = 'Degradação por fogo', tipo_fluxo = 'Emissão'
-//   edge_co2       → categoria = 'Degradação florestal', subcategoria = 'Efeito de borda',tipo_fluxo = 'Emissão'
-//   defor_sf_co2   → categoria = 'Desmatamento',    subcategoria = 'Floresta secundária', tipo_fluxo = 'Emissão'
-//   removal_sf_co2 → categoria = 'Floresta secundária', subcategoria = 'Regeneração natural', tipo_fluxo = 'Remoção'
-//
-// UNIDADES:
-//   Todas as bandas *_co2 → Mg CO₂ pixel⁻¹ yr⁻¹  →  soma = Mg CO₂ yr⁻¹ por território
-//   1 Mg CO₂ = 1 t CO₂ (mega = 10⁶ g = 1 t)
-//   Dashboard usa MgCO2e (unidade consistente com o pipeline)
-//
-// CONSOLIDAÇÃO: use o script R  ybyra_consolidate.R
