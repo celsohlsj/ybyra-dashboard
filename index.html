@@ -533,11 +533,13 @@ tbody td  { padding:10px 14px; color:var(--ink) }
         <span class="filter-label">Tipo de recorte</span>
         <select class="filter-select" id="f-terrtype" onchange="applyFilters()">
           <option value="all">Todos</option>
-          <option value="municipio">Município</option>
-          <option value="estado">Estado</option>
-          <option value="regiao">Região</option>
-          <option value="bioma">Bioma</option>
           <option value="pais">Brasil</option>
+          <option value="bioma">Bioma</option>
+          <option value="estado">Estado</option>
+          <option value="terra_indigena">Terra Indígena</option>
+          <option value="uc">Unidade de Conservação</option>
+          <option value="quilombo">Quilombo</option>
+          <option value="municipio">Município</option>
         </select>
       </div>
       <div class="filter-group">
@@ -822,7 +824,7 @@ tbody td  { padding:10px 14px; color:var(--ink) }
         <table id="data-table">
           <thead>
             <tr>
-              <th>Ano</th><th>Tipo</th><th>Território</th><th>Bioma</th><th>Estado</th><th>Região</th><th>Categoria</th><th>Fluxo</th><th>Valor (MgCO₂e)</th><th>Fonte</th>
+              <th>Ano</th><th>Tipo</th><th>Território</th><th>Bioma</th><th>Área (Mha)</th><th>Categoria</th><th>Subcategoria</th><th>Fluxo</th><th>Valor (MgCO₂e)</th><th>Fonte</th>
             </tr>
           </thead>
           <tbody id="data-tbody"></tbody>
@@ -925,9 +927,9 @@ tbody td  { padding:10px 14px; color:var(--ink) }
       <div class="chart-card" style="margin-top:14px">
         <div class="chart-title" style="margin-bottom:8px">Carregar dados externos (CSV)</div>
         <div style="font-size:13px;color:var(--ink-light);margin-bottom:12px">Carregue um CSV com a estrutura padrão do YbYrá-BR para substituir os dados de demonstração.</div>
-        <input type="file" id="csv-upload" accept=".csv" style="display:none" onchange="loadExternalCSV(event)"/>
-        <button class="btn btn-outline" onclick="document.getElementById('csv-upload').click()">📂 Carregar CSV local</button>
-        <span style="font-size:11.5px;color:var(--ink-light);margin-left:12px">ano, territorio_tipo, territorio_nome, territorio_codigo, bioma, estado, regiao, municipio, categoria, subcategoria, tipo_fluxo, valor_co2e, unidade, fonte, versao</span>
+        <input type="file" id="csv-upload" accept=".csv" multiple style="display:none" onchange="loadExternalCSV(event)"/>
+        <button class="btn btn-outline" onclick="document.getElementById('csv-upload').click()">📂 Carregar CSV(s) do YbYrá-BR</button>
+        <span style="font-size:11.5px;color:var(--ink-light);margin-left:12px">Formato: <strong>id_territorio, nome_territorio, Ano, area_ha, total_primary_co2, edge_co2, logging_co2, fire_co2, defor_co2, removal_sf_co2, defor_sf_co2, agc_sf_co2, net_co2</strong> — aceita múltiplos arquivos (brasil, biomas, estados, TIs, UCs, quilombos, municípios)</span>
       </div>
     </section>
 
@@ -936,191 +938,50 @@ tbody td  { padding:10px 14px; color:var(--ink) }
 </div><!-- /app -->
 <div id="toast"></div>
 <script>
-const DEMO_CSV = `ano,territorio_tipo,territorio_nome,territorio_codigo,bioma,estado,regiao,municipio,categoria,subcategoria,tipo_fluxo,valor_co2e,unidade,fonte,versao
-2017,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,210000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,45000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,18000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,22000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,8000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,38000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,95000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,25000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,8000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,55000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,185000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,62000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,15000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,22000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,42000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,18000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,12000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,4000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,88000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,20000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,12000000,MgCO2e,YbYrá-BR,v1.2
-2017,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,18000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,225000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,50000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,20000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,24000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,9000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,40000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,105000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,9000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,57000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,190000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,65000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,16000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,23000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,45000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,20000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,14000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,4500000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14500000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,92000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,22000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,13000000,MgCO2e,YbYrá-BR,v1.2
-2018,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,19000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,275000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,95000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,28000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,26000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,10000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,36000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,130000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,60000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,12000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,52000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,210000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,72000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,18000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,20000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,50000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,22000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,20000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,5000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,13000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,105000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,40000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,14000000,MgCO2e,YbYrá-BR,v1.2
-2019,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,17000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,260000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,70000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,25000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,25000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,10500000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,37500000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,120000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,45000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,10000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,53000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,200000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,70000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,17000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,21000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,48000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,21000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,16000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,4200000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,13500000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,98000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,12500000,MgCO2e,YbYrá-BR,v1.2
-2020,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,18500000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,240000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,65000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,22000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,23000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,9500000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,39000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,115000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,42000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,9500000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,54000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,195000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,68000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,16000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,22000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,44000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,19000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,14000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,3800000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,95000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,26000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,12000000,MgCO2e,YbYrá-BR,v1.2
-2021,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,19000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,230000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,60000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,21000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,22000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,9000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,40000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,110000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,38000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,9000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,55000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,188000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,66000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,15000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,23000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,40000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,17000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,12000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,3500000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,14500000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,90000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,24000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,11000000,MgCO2e,YbYrá-BR,v1.2
-2022,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,20000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,155614788,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,32000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,15000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,18000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,7500000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,32000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,88000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,8200000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,57000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,165000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,58000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,14000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,25000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,35000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,15000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,10000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,3200000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,15000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,72000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,18000000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,9500000,MgCO2e,YbYrá-BR,v1.2
-2023,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,21000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta primária,Emissão,140000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Pará,PA,Amazônia,Pará,Norte,,Fogo,Degradação por fogo,Emissão,28000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Pará,PA,Amazônia,Pará,Norte,,Degradação florestal,Efeito de borda,Emissão,14000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Pará,PA,Amazônia,Pará,Norte,,Corte seletivo,Exploração madeireira,Emissão,17000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Pará,PA,Amazônia,Pará,Norte,,Desmatamento,Floresta secundária,Emissão,7000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Pará,PA,Amazônia,Pará,Norte,,Floresta secundária,Regeneração natural,Remoção,34000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Desmatamento,Floresta primária,Emissão,75000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Fogo,Degradação por fogo,Emissão,22000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Corte seletivo,Exploração madeireira,Emissão,7500000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Amazonas,AM,Amazônia,Amazonas,Norte,,Floresta secundária,Regeneração natural,Remoção,59000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,152000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Mato Grosso,MT,Cerrado,Mato Grosso,Centro-Oeste,,Desmatamento,Floresta primária,Emissão,55000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Corte seletivo,Exploração madeireira,Emissão,13000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Mato Grosso,MT,Amazônia,Mato Grosso,Centro-Oeste,,Floresta secundária,Regeneração natural,Remoção,26000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,30000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Maranhão,MA,Cerrado,Maranhão,Nordeste,,Desmatamento,Floresta primária,Emissão,13000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Fogo,Degradação por fogo,Emissão,9000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Corte seletivo,Exploração madeireira,Emissão,2800000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Maranhão,MA,Amazônia,Maranhão,Nordeste,,Floresta secundária,Regeneração natural,Remoção,15500000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Desmatamento,Floresta primária,Emissão,65000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Fogo,Degradação por fogo,Emissão,15000000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Corte seletivo,Exploração madeireira,Emissão,8500000,MgCO2e,YbYrá-BR,v1.2
-2024,estado,Rondônia,RO,Amazônia,Rondônia,Norte,,Floresta secundária,Regeneração natural,Remoção,22000000,MgCO2e,YbYrá-BR,v1`;
+// Formato largo (wide) do GEE — colunas do script ybyra_precalc_statistics_v1_2.js
+// id_territorio, nome_territorio, Ano, area_ha, total_primary_co2, edge_co2, logging_co2,
+// fire_co2, defor_co2, removal_sf_co2, defor_sf_co2, agc_sf_co2, net_co2
+const DEMO_CSV = `id_territorio,nome_territorio,Ano,area_ha,total_primary_co2,edge_co2,logging_co2,fire_co2,defor_co2,removal_sf_co2,defor_sf_co2,agc_sf_co2,net_co2
+15,Pará,2017,124276000,285000000,18000000,22000000,45000000,200000000,38000000,8000000,1200000000,255000000
+15,Pará,2018,124276000,299000000,20000000,24000000,50000000,205000000,40000000,9000000,1210000000,268000000
+15,Pará,2019,124276000,312000000,22000000,23000000,55000000,212000000,41000000,9000000,1215000000,280000000
+15,Pará,2020,124276000,325000000,23000000,25000000,60000000,217000000,42000000,10000000,1218000000,293000000
+15,Pará,2021,124276000,285000000,21000000,22000000,42000000,200000000,43000000,9000000,1222000000,251000000
+15,Pará,2022,124276000,265000000,19000000,20000000,38000000,188000000,43000000,8000000,1226000000,230000000
+15,Pará,2023,124276000,250000000,18000000,19000000,35000000,178000000,44000000,8000000,1230000000,214000000
+15,Pará,2024,124276000,260000000,18000000,19000000,40000000,183000000,44000000,8000000,1232000000,224000000
+13,Amazonas,2017,155000000,128000000,15000000,8000000,25000000,80000000,55000000,6000000,2200000000,79000000
+13,Amazonas,2018,155000000,145000000,17000000,9000000,28000000,91000000,57000000,7000000,2205000000,95000000
+13,Amazonas,2019,155000000,148000000,17000000,9000000,30000000,92000000,57000000,7000000,2207000000,98000000
+13,Amazonas,2020,155000000,165000000,18000000,10000000,35000000,102000000,58000000,8000000,2210000000,115000000
+13,Amazonas,2021,155000000,140000000,16000000,8000000,28000000,88000000,59000000,7000000,2215000000,88000000
+13,Amazonas,2022,155000000,125000000,15000000,7000000,25000000,78000000,60000000,6000000,2220000000,71000000
+13,Amazonas,2023,155000000,118000000,14000000,7000000,22000000,75000000,60000000,6000000,2225000000,64000000
+13,Amazonas,2024,155000000,122000000,14000000,7000000,24000000,77000000,61000000,6000000,2228000000,67000000
+51,Mato Grosso,2017,90000000,262000000,12000000,15000000,35000000,200000000,22000000,10000000,650000000,250000000
+51,Mato Grosso,2018,90000000,278000000,13000000,16000000,38000000,211000000,23000000,11000000,640000000,266000000
+51,Mato Grosso,2019,90000000,290000000,14000000,16000000,42000000,218000000,23000000,11000000,628000000,278000000
+51,Mato Grosso,2020,90000000,310000000,15000000,18000000,48000000,229000000,24000000,12000000,614000000,298000000
+51,Mato Grosso,2021,90000000,270000000,13000000,16000000,36000000,205000000,24000000,11000000,603000000,257000000
+51,Mato Grosso,2022,90000000,248000000,12000000,15000000,32000000,189000000,25000000,10000000,595000000,233000000
+51,Mato Grosso,2023,90000000,238000000,12000000,14000000,30000000,182000000,25000000,10000000,588000000,223000000
+51,Mato Grosso,2024,90000000,242000000,12000000,15000000,31000000,184000000,26000000,10000000,582000000,226000000
+21,Maranhão,2017,33000000,72000000,8000000,4000000,12000000,48000000,14000000,5000000,180000000,63000000
+21,Maranhão,2018,33000000,78000000,8000000,4000000,14000000,52000000,14000000,5000000,175000000,69000000
+21,Maranhão,2019,33000000,82000000,9000000,5000000,15000000,53000000,15000000,6000000,170000000,73000000
+21,Maranhão,2020,33000000,90000000,10000000,5000000,18000000,57000000,15000000,6000000,163000000,81000000
+21,Maranhão,2021,33000000,76000000,8000000,4000000,13000000,51000000,15000000,5000000,158000000,66000000
+21,Maranhão,2022,33000000,68000000,7000000,3000000,11000000,47000000,16000000,5000000,154000000,57000000
+21,Maranhão,2023,33000000,65000000,7000000,3000000,10000000,45000000,16000000,5000000,151000000,54000000
+21,Maranhão,2024,33000000,68000000,7000000,3000000,11000000,47000000,16000000,5000000,149000000,57000000
+11,Rondônia,2017,23000000,120000000,10000000,12000000,20000000,78000000,18000000,6000000,290000000,108000000
+11,Rondônia,2018,23000000,132000000,11000000,13000000,22000000,86000000,19000000,7000000,282000000,120000000
+11,Rondônia,2019,23000000,140000000,11000000,14000000,25000000,90000000,19000000,7000000,272000000,128000000
+11,Rondônia,2020,23000000,150000000,12000000,15000000,27000000,96000000,20000000,8000000,260000000,138000000
+11,Rondônia,2021,23000000,122000000,10000000,12000000,20000000,80000000,21000000,6000000,252000000,107000000
+11,Rondônia,2022,23000000,108000000,9000000,10000000,17000000,72000000,21000000,6000000,247000000,93000000
+11,Rondônia,2023,23000000,100000000,8000000,9000000,15000000,68000000,21000000,5000000,244000000,84000000
+11,Rondônia,2024,23000000,105000000,9000000,9000000,16000000,71000000,22000000,5000000,242000000,88000000`;
 
 // ─────────────────────────────────────────────
 // STATE
@@ -1147,15 +1008,61 @@ function catColor(cat, i, isRemoval) {
 }
 
 // ─────────────────────────────────────────────
+// FORMAT DETECTION & WIDE→LONG TRANSFORM
+// ─────────────────────────────────────────────
+function isWideFormat(fields) {
+  return fields.includes('Ano') && fields.includes('nome_territorio') && fields.includes('defor_co2');
+}
+
+function detectTipoFromFilename(name) {
+  const n = name.toLowerCase();
+  if (n.includes('brasil')) return 'pais';
+  if (n.includes('biomas')) return 'bioma';
+  if (n.includes('estados')) return 'estado';
+  if (n.includes('terras_indigenas') || n.includes('terras indigenas')) return 'terra_indigena';
+  if (n.includes('unidades_conservacao') || n.includes('unidades conservacao')) return 'uc';
+  if (n.includes('quilombos')) return 'quilombo';
+  if (n.includes('municipios') || n.includes('municipio')) return 'municipio';
+  return 'estado';
+}
+
+function wideRowToLong(row, tipo) {
+  const base = {
+    ano: +row.Ano || 0,
+    territorio_tipo: tipo,
+    territorio_nome: String(row.nome_territorio || ''),
+    territorio_codigo: String(row.id_territorio || ''),
+    area_ha: +row.area_ha || 0,
+    net_co2_ref: +row.net_co2 || 0,
+    agc_sf_co2: +row.agc_sf_co2 || 0,
+    bioma: tipo === 'bioma' ? String(row.nome_territorio || '') : '',
+    estado: '', regiao: '', municipio: '',
+    fonte: 'YbYrá-BR', versao: 'v1_2'
+  };
+  return [
+    { ...base, categoria: 'Desmatamento',       subcategoria: 'Floresta primária',       tipo_fluxo: 'Emissão', valor_co2e: +row.defor_co2      || 0 },
+    { ...base, categoria: 'Degradação florestal',subcategoria: 'Efeito de borda',         tipo_fluxo: 'Emissão', valor_co2e: +row.edge_co2       || 0 },
+    { ...base, categoria: 'Corte seletivo',      subcategoria: 'Exploração madeireira',   tipo_fluxo: 'Emissão', valor_co2e: +row.logging_co2    || 0 },
+    { ...base, categoria: 'Fogo',                subcategoria: 'Degradação por fogo',     tipo_fluxo: 'Emissão', valor_co2e: +row.fire_co2       || 0 },
+    { ...base, categoria: 'Floresta secundária', subcategoria: 'Desmatamento SF',         tipo_fluxo: 'Emissão', valor_co2e: +row.defor_sf_co2   || 0 },
+    { ...base, categoria: 'Floresta secundária', subcategoria: 'Regeneração natural',     tipo_fluxo: 'Remoção', valor_co2e: +row.removal_sf_co2 || 0 },
+  ].filter(r => r.valor_co2e > 0);
+}
+
+// ─────────────────────────────────────────────
 // LOAD DATA
 // ─────────────────────────────────────────────
-function loadData(csvText) {
+function parseCSV(csvText, tipo) {
   const result = Papa.parse(csvText, { header: true, skipEmptyLines: true, dynamicTyping: true });
-  allData = result.data.map(r => ({
-    ...r,
-    valor_co2e: +r.valor_co2e || 0,
-    ano: +r.ano || 0
-  }));
+  const fields = result.meta.fields || [];
+  if (isWideFormat(fields)) {
+    return result.data.flatMap(r => wideRowToLong(r, tipo));
+  }
+  return result.data.map(r => ({ ...r, valor_co2e: +r.valor_co2e || 0, ano: +r.ano || 0 }));
+}
+
+function loadData(csvText, tipo = 'estado') {
+  allData = parseCSV(csvText, tipo);
   populateFilters();
   applyFilters();
 }
@@ -1823,12 +1730,12 @@ function renderTable() {
       <td style="font-size:11px;color:#7a9475">${r.territorio_tipo || '—'}</td>
       <td>${r.territorio_nome}</td>
       <td>${r.bioma || '—'}</td>
-      <td>${r.estado || '—'}</td>
-      <td>${r.regiao || '—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.area_ha ? (r.area_ha/1e6).toFixed(2) : '—'}</td>
       <td>${r.categoria}</td>
+      <td style="font-size:11px;color:#7a9475">${r.subcategoria || '—'}</td>
       <td><span class="badge ${r.tipo_fluxo === 'Emissão' ? 'emission' : 'removal'}">${r.tipo_fluxo}</span></td>
       <td style="font-family:'DM Mono',monospace">${r.valor_co2e?.toLocaleString('pt-BR')}</td>
-      <td>${r.fonte}</td>
+      <td>${r.fonte || 'YbYrá-BR'}</td>
     </tr>`).join('');
 }
 
@@ -2026,17 +1933,27 @@ function exportReportPDF() {
 }
 
 // ─────────────────────────────────────────────
-// LOAD EXTERNAL CSV
+// LOAD EXTERNAL CSV(S)
 // ─────────────────────────────────────────────
 function loadExternalCSV(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    loadData(e.target.result);
-    toast(`Dados carregados: ${file.name}`);
-  };
-  reader.readAsText(file);
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  const chunks = new Array(files.length);
+  let pending = files.length;
+  files.forEach((file, i) => {
+    const tipo = detectTipoFromFilename(file.name);
+    const reader = new FileReader();
+    reader.onload = e => {
+      chunks[i] = parseCSV(e.target.result, tipo);
+      if (--pending === 0) {
+        allData = chunks.flat();
+        populateFilters();
+        applyFilters();
+        toast(`${files.length} arquivo(s) carregado(s) · ${allData.length} registros`);
+      }
+    };
+    reader.readAsText(file);
+  });
 }
 
 // ─────────────────────────────────────────────
@@ -2053,7 +1970,29 @@ function toast(msg) {
 // INIT
 // ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  loadData(DEMO_CSV);
+  // Try to auto-load real CSVs from the data/ folder (works when served via HTTP)
+  const AUTO_FILES = [
+    { path: 'data/YbYraBR_brasil_v1_2.csv',               tipo: 'pais'          },
+    { path: 'data/YbYraBR_biomas_v1_2.csv',               tipo: 'bioma'         },
+    { path: 'data/YbYraBR_estados_v1_2.csv',              tipo: 'estado'        },
+    { path: 'data/YbYraBR_terras_indigenas_v1_2.csv',     tipo: 'terra_indigena'},
+    { path: 'data/YbYraBR_unidades_conservacao_v1_2.csv', tipo: 'uc'            },
+    { path: 'data/YbYraBR_quilombos_v1_2.csv',            tipo: 'quilombo'      },
+  ];
+  Promise.all(
+    AUTO_FILES.map(f => fetch(f.path).then(r => r.ok ? r.text().then(t => ({ t, tipo: f.tipo })) : null).catch(() => null))
+  ).then(results => {
+    const found = results.filter(Boolean);
+    if (found.length > 0) {
+      allData = found.flatMap(({ t, tipo }) => parseCSV(t, tipo));
+      populateFilters();
+      applyFilters();
+      toast(`${found.length} arquivo(s) carregado(s) automaticamente`);
+    } else {
+      loadData(DEMO_CSV, 'estado');
+    }
+  });
+
   window.addEventListener('resize', () => {
     Object.values(charts).forEach(c => { try { c.resize(); } catch(e){} });
   });
